@@ -1,0 +1,32 @@
+# RAGGuard RBAC+ABAC source of truth (plan Section 7).
+#
+# classification_levels is an ordered list — a role can read everything AT OR BELOW
+# its per-department ceiling. A department absent from a role's entry means zero access.
+
+classification_levels: [PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED, TOP_SECRET]
+
+roles:
+  ceo:
+    finance: TOP_SECRET
+    it: TOP_SECRET
+    hr: TOP_SECRET
+    security: TOP_SECRET
+    executive: TOP_SECRET
+  cfo:
+    finance: CONFIDENTIAL
+    hr: INTERNAL
+    executive: INTERNAL
+  cto:
+    it: CONFIDENTIAL
+    security: INTERNAL
+    executive: INTERNAL
+  hr_manager:
+    hr: CONFIDENTIAL
+  security_engineer:
+    security: RESTRICTED
+  it_engineer:
+    it: INTERNAL
+  accountant:
+    finance: CONFIDENTIAL
+  employee:
+    general: PUBLIC

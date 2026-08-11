@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAGGuard</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <!-- Login view -->
+  <div id="login-view" class="login-card">
+    <h1>RAGGuard</h1>
+    <p class="subtitle">Permission-aware RAG assistant</p>
+    <form id="login-form">
+      <label>Username
+        <input id="login-username" type="text" autocomplete="username" required />
+      </label>
+      <label>Password
+        <input id="login-password" type="password" autocomplete="current-password" required />
+      </label>
+      <button type="submit">Sign in</button>
+      <p id="login-error" class="error" hidden></p>
+    </form>
+    <p class="hint">Demo users: <code>accountant01</code>, <code>ceo01</code>, <code>iteng01</code> … password <code>Password123!</code></p>
+  </div>
+
+  <!-- App view -->
+  <div id="app-view" hidden>
+    <header>
+      <span class="brand">RAGGuard</span>
+      <span id="user-chip" class="user-chip"></span>
+      <button id="logout-btn" class="ghost">Sign out</button>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="chat">Chat</button>
+      <button class="tab" data-tab="admin" id="admin-tab" hidden>Admin</button>
+    </nav>
+
+    <!-- Chat tab -->
+    <main id="tab-chat" class="tab-panel">
+      <div id="chat-log" class="chat-log"></div>
+      <form id="chat-form" class="chat-form">
+        <input id="chat-input" type="text" placeholder="Ask about documents you have access to…" autocomplete="off" required />
+        <button type="submit">Send</button>
+      </form>
+    </main>
+
+    <!-- Admin tab -->
+    <main id="tab-admin" class="tab-panel" hidden>
+      <section class="card">
+        <h2>Upload a document</h2>
+        <form id="upload-form" class="row">
+          <input id="up-file" type="file" accept=".pdf,.txt,.md" required />
+          <input id="up-department" list="dept-list" placeholder="department (e.g. finance)" required />
+          <input id="up-classification" list="class-list" placeholder="classification (e.g. CONFIDENTIAL)" required />
+          <button type="submit">Upload</button>
+        </form>
+        <datalist id="dept-list">
+          <option value="finance"></option><option value="it"></option><option value="hr"></option>
+          <option value="security"></option><option value="executive"></option><option value="general"></option>
+        </datalist>
+        <datalist id="class-list">
+          <option value="PUBLIC"></option><option value="INTERNAL"></option><option value="CONFIDENTIAL"></option>
+          <option value="RESTRICTED"></option><option value="TOP_SECRET"></option>
+        </datalist>
+        <p id="upload-msg" class="muted"></p>
+      </section>
+
+      <section class="card">
+        <h2>Documents you can see</h2>
+        <table id="docs-table">
+          <thead><tr><th>#</th><th>Filename</th><th>Department</th><th>Classification</th><th>Chunks</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>Security events</h2>
+        <table id="events-table">
+          <thead><tr><th>Time</th><th>Action</th><th>User</th><th>Decision</th><th>Reason</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

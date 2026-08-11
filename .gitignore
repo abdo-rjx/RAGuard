@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+
+# Virtual env
+.venv/
+
+# App data (gitignored per plan Section 5)
+data/
+*.db
+
+# Environment
+.env
+
+# Local Claude Code config (settings.json holds a local relay auth token)
+.claude/
+
+# OS
+.DS_Store
