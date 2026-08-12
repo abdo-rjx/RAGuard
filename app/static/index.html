@@ -3,86 +3,278 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RAGGuard</title>
+  <title>RAGGuard — Secure Document Intelligence</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2l11 4v9c0 7-4.5 12.5-11 15C9.5 27.5 5 22 5 15V6z' fill='%230b28a6'/%3E%3Cpath d='M11.5 16l3 3 6-6.5' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <!-- Login view -->
-  <div id="login-view" class="login-card">
-    <h1>RAGGuard</h1>
-    <p class="subtitle">Permission-aware RAG assistant</p>
-    <form id="login-form">
-      <label>Username
-        <input id="login-username" type="text" autocomplete="username" required />
-      </label>
-      <label>Password
-        <input id="login-password" type="password" autocomplete="current-password" required />
-      </label>
-      <button type="submit">Sign in</button>
-      <p id="login-error" class="error" hidden></p>
-    </form>
-    <p class="hint">Demo users: <code>accountant01</code>, <code>ceo01</code>, <code>iteng01</code> … password <code>Password123!</code></p>
+
+  <!-- ============ LOGIN VIEW ============ -->
+  <div id="login-view" class="login-shell">
+    <aside class="login-brand">
+      <div>
+        <div class="brand-mark">
+          <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M16 2l11 4v9c0 7-4.5 12.5-11 15C9.5 27.5 5 22 5 15V6z" fill="rgba(255,255,255,0.12)"/>
+            <path d="M16 2l11 4v9c0 7-4.5 12.5-11 15C9.5 27.5 5 22 5 15V6z" fill="none" stroke="#fff" stroke-width="1.5"/>
+            <path d="M11.5 16l3 3 6-6.5" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          RAGGuard
+        </div>
+
+        <h2 style="margin-top:56px;">Secure document intelligence for your enterprise.</h2>
+        <p class="tagline">Ask questions across your internal documents. Answers are limited to what you are authorized to see — and every access decision is audited.</p>
+
+        <div class="login-points">
+          <div class="login-point">
+            <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 9.5-8 11-4.5-1.5-8-6-8-11V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+            <p><b>Permission-aware retrieval</b><br/>Documents are filtered by your role and department before they ever reach the model.</p>
+          </div>
+          <div class="login-point">
+            <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 8v4l2.5 2.5"/><circle cx="12" cy="12" r="9"/></svg></span>
+            <p><b>Full audit trail</b><br/>Logins, queries, blocked attempts and every denial are recorded and reviewable.</p>
+          </div>
+          <div class="login-point">
+            <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg></span>
+            <p><b>No unauthorized data</b><br/>Your documents stay inside your perimeter. Nothing above your clearance ever enters the answer.</p>
+          </div>
+        </div>
+      </div>
+      <div class="foot">© 2026 RAGGuard Labs · Internal use only</div>
+    </aside>
+
+    <main class="login-form-side">
+      <div class="login-card">
+        <h1>Sign in</h1>
+        <p class="sub">Use your enterprise credentials.</p>
+
+        <div id="login-error" class="login-error" hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="9"/><path d="M12 8v4m0 4h.01"/></svg>
+          <span id="login-error-text"></span>
+        </div>
+
+        <form id="login-form" autocomplete="on">
+          <div class="field">
+            <label for="login-username">Username</label>
+            <input id="login-username" class="input" type="text" autocomplete="username" placeholder="e.g. accountant01" required />
+          </div>
+          <div class="field">
+            <label for="login-password">Password</label>
+            <input id="login-password" class="input" type="password" autocomplete="current-password" placeholder="••••••••••" required />
+          </div>
+          <button type="submit" class="btn btn-primary" id="login-btn">Sign in</button>
+        </form>
+
+        <div class="login-hint">
+          <b>Demo accounts</b> — password <code>Password123!</code><br/>
+          <code>ceo01</code> · <code>cfo01</code> · <code>cto01</code> · <code>hr01</code> · <code>iteng01</code> · <code>accountant01</code> · <code>employee01</code>
+        </div>
+
+        <div class="secure-note">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+          Protected by RAGGuard access control
+        </div>
+      </div>
+    </main>
   </div>
 
-  <!-- App view -->
-  <div id="app-view" hidden>
-    <header>
-      <span class="brand">RAGGuard</span>
-      <span id="user-chip" class="user-chip"></span>
-      <button id="logout-btn" class="ghost">Sign out</button>
+  <!-- ============ APP VIEW ============ -->
+  <div id="app-view" class="app-shell" hidden>
+
+    <header class="topbar">
+      <div class="brand-mark">
+        <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 2l11 4v9c0 7-4.5 12.5-11 15C9.5 27.5 5 22 5 15V6z" fill="#0b28a6"/>
+          <path d="M11.5 16l3 3 6-6.5" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        RAGGuard
+      </div>
+      <nav>
+        <button class="tab active" data-tab="chat">Chat</button>
+        <button class="tab" data-tab="admin" id="admin-tab" hidden>Admin</button>
+      </nav>
+      <div class="user-chip">
+        <div class="who">
+          <div class="name" id="user-name"></div>
+          <div class="role" id="user-role"></div>
+        </div>
+        <div class="avatar" id="user-avatar"></div>
+        <button class="btn btn-ghost btn-sm" id="logout-btn" title="Sign out">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        </button>
+      </div>
     </header>
 
-    <nav class="tabs">
-      <button class="tab active" data-tab="chat">Chat</button>
-      <button class="tab" data-tab="admin" id="admin-tab" hidden>Admin</button>
-    </nav>
+    <!-- ---------- CHAT ---------- -->
+    <div id="tab-chat" class="tab-panel" style="display:contents;">
+      <div class="chat-wrap">
+        <aside class="chat-sidebar">
+          <button class="btn btn-primary new-chat" id="new-chat-btn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+            New conversation
+          </button>
 
-    <!-- Chat tab -->
-    <main id="tab-chat" class="tab-panel">
-      <div id="chat-log" class="chat-log"></div>
-      <form id="chat-form" class="chat-form">
-        <input id="chat-input" type="text" placeholder="Ask about documents you have access to…" autocomplete="off" required />
-        <button type="submit">Send</button>
+          <h4>Recent</h4>
+          <div id="conv-list"></div>
+
+          <div class="access-card">
+            <h5>Your access</h5>
+            <div id="access-list"></div>
+          </div>
+        </aside>
+
+        <main class="chat-main">
+          <div class="chat-header">
+            <div class="title">Workspace assistant</div>
+            <div class="status" id="llm-status"><span class="dot"></span><span id="llm-status-text">Checking model…</span></div>
+          </div>
+
+          <div class="thread" id="thread">
+            <div class="thread-inner" id="thread-inner"></div>
+          </div>
+
+          <div class="composer">
+            <div class="composer-inner">
+              <textarea id="chat-input" rows="1" placeholder="Ask about documents you have access to…" aria-label="Message"></textarea>
+              <button class="send" id="chat-send" title="Send" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4l17.4-7.5c.8-.35.8-1.45 0-1.8L3.4 3.6c-.65-.28-1.4.2-1.4.9v5.1c0 .5.36.93.85 1L15 12 2.85 13.4c-.49.07-.85.5-.85 1v5.1c0 .7.75 1.18 1.4.9z"/></svg>
+              </button>
+            </div>
+            <div class="composer-hint">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 9.5-8 11-4.5-1.5-8-6-8-11V6z"/></svg>
+              Answers are limited to documents you are authorized to access.
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- ---------- ADMIN ---------- -->
+    <div id="tab-admin" class="tab-panel admin-main" hidden>
+
+      <!-- Documents -->
+      <div class="admin-inner">
+        <div class="page-head">
+          <div>
+            <h1>Documents<span class="count" id="docs-count">0</span></h1>
+            <p>Every document is tagged with a department and a classification. Retrieval respects both.</p>
+          </div>
+          <button class="btn btn-primary" id="upload-btn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0l-4 4m4-4l4 4"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+            Upload document
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="filter-bar">
+            <input id="doc-search" class="input grow" type="text" placeholder="Search by filename…" />
+            <select id="doc-dept-filter" class="select"><option value="">All departments</option></select>
+            <select id="doc-class-filter" class="select"><option value="">All classifications</option></select>
+          </div>
+          <div class="table-wrap">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>Document</th>
+                  <th>Department</th>
+                  <th>Classification</th>
+                  <th>Chunks</th>
+                  <th>Uploaded</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="docs-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Audit logs -->
+        <div class="page-head" style="margin-top:36px;">
+          <div>
+            <h1>Audit logs</h1>
+            <p>Every login, query and access decision is recorded. Security events are highlighted.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="filter-bar">
+            <input id="audit-user" class="input" type="text" placeholder="Username" />
+            <select id="audit-action" class="select">
+              <option value="">All actions</option>
+              <option>LOGIN</option>
+              <option>LOGIN_FAILED</option>
+              <option>CHAT_QUERY</option>
+              <option>DOCUMENT_UPLOAD</option>
+              <option>DOCUMENT_DELETE</option>
+              <option>ACCESS_DENIED</option>
+              <option>INJECTION_SUSPECTED_QUERY</option>
+              <option>INJECTION_SUSPECTED_CONTEXT</option>
+              <option>OUTPUT_BLOCKED</option>
+            </select>
+            <select id="audit-decision" class="select">
+              <option value="">Any decision</option>
+              <option>ALLOW</option>
+              <option>DENY</option>
+            </select>
+            <button class="btn btn-secondary" id="audit-apply">Apply filters</button>
+            <button class="btn btn-ghost" id="audit-clear">Reset</button>
+          </div>
+          <div class="table-wrap">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>User</th>
+                  <th>Action</th>
+                  <th>Decision</th>
+                  <th>Reason / query</th>
+                </tr>
+              </thead>
+              <tbody id="audit-body"></tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <span id="audit-page-info"></span>
+            <button class="btn btn-secondary" id="audit-prev">← Prev</button>
+            <button class="btn btn-secondary" id="audit-next">Next →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload modal -->
+  <div id="upload-modal" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="upload-title">
+      <div class="modal-head">
+        <div>
+          <h3 id="upload-title">Upload document</h3>
+          <p>Tag it with a department and classification so retrieval can enforce access.</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="upload-close" aria-label="Close">✕</button>
+      </div>
+      <form id="upload-form" class="modal-body">
+        <div class="dropzone" id="dropzone">
+          <div id="dz-label"><b>Choose a file</b> or drag it here</div>
+          <div class="exts">PDF · TXT · MD — up to 10 MB</div>
+          <input id="doc-file" type="file" accept=".pdf,.txt,.md" hidden />
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="doc-dept">Department</label>
+            <select id="doc-dept" class="select" required></select>
+          </div>
+          <div class="field">
+            <label for="doc-class">Classification</label>
+            <select id="doc-class" class="select" required></select>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn btn-secondary" id="upload-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="upload-submit">Upload</button>
+        </div>
       </form>
-    </main>
-
-    <!-- Admin tab -->
-    <main id="tab-admin" class="tab-panel" hidden>
-      <section class="card">
-        <h2>Upload a document</h2>
-        <form id="upload-form" class="row">
-          <input id="up-file" type="file" accept=".pdf,.txt,.md" required />
-          <input id="up-department" list="dept-list" placeholder="department (e.g. finance)" required />
-          <input id="up-classification" list="class-list" placeholder="classification (e.g. CONFIDENTIAL)" required />
-          <button type="submit">Upload</button>
-        </form>
-        <datalist id="dept-list">
-          <option value="finance"></option><option value="it"></option><option value="hr"></option>
-          <option value="security"></option><option value="executive"></option><option value="general"></option>
-        </datalist>
-        <datalist id="class-list">
-          <option value="PUBLIC"></option><option value="INTERNAL"></option><option value="CONFIDENTIAL"></option>
-          <option value="RESTRICTED"></option><option value="TOP_SECRET"></option>
-        </datalist>
-        <p id="upload-msg" class="muted"></p>
-      </section>
-
-      <section class="card">
-        <h2>Documents you can see</h2>
-        <table id="docs-table">
-          <thead><tr><th>#</th><th>Filename</th><th>Department</th><th>Classification</th><th>Chunks</th><th></th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </section>
-
-      <section class="card">
-        <h2>Security events</h2>
-        <table id="events-table">
-          <thead><tr><th>Time</th><th>Action</th><th>User</th><th>Decision</th><th>Reason</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </section>
-    </main>
+    </div>
   </div>
 
   <script src="/static/app.js"></script>

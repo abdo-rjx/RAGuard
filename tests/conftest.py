@@ -9,6 +9,7 @@ import tempfile
 _TEST_DIR = tempfile.mkdtemp(prefix="ragguard_test_")
 os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DIR}/test.db"
 os.environ["CHROMA_PERSIST_DIR"] = os.path.join(_TEST_DIR, "chroma")
+os.environ["ENVIRONMENT"] = "test"  # Disable rate limiter during tests
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -106,7 +107,8 @@ def login(client):
 
 class FakeVectorStore:
     """Returns every seeded chunk regardless of the `where` filter — simulates a
-    broken/leaky Chroma filter so the defense-in-depth re-check is the real gate."""
+    broken/leaky Chroma filter so the defense-in-depth re-check is the real gate.
+    """
 
     def __init__(self, chunks: list[RetrievedChunk]):
         self._chunks = chunks

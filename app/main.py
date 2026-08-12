@@ -11,10 +11,13 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.database import init_db
 from app.policy.policy_engine import get_policy_engine
+from app.rate_limit import limiter
 from app.routers import audit_router, auth_router, chat_router, documents_router
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -34,6 +37,10 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# Add rate limiting to app
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
 
 app.include_router(auth_router.router)
 app.include_router(chat_router.router)

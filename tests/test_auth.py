@@ -59,3 +59,60 @@ def test_me_rejects_expired_token(client):
 def test_admin_sees_admin_flag(client, login):
     body = client.get("/auth/me", headers={"Authorization": f"Bearer {login('ceo01')}"}).json()
     assert body["is_admin"] is True
+
+
+# ---- DB is the source of truth on every request (not the token) ------------
+
+def test_deactivated_user_loses_access_immediately(client, login, db_session_factory):
+    """A token minted before deactivation must stop working right away."""
+    token = login("accountant01")
+    assert client.get("/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 200
+
+    db = db_session_factory()
+    try:
+        from app.models.user import User
+
+        user = db.query(User).filter(User.username == "accountant01").first()
+        user.is_active = False
+        db.commit()
+    finally:
+        db.close()
+
+    r = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 401
+
+
+def test_deleted_user_loses_access_immediately(client, login, db_session_factory):
+    token = login("accountant01")
+    db = db_session_factory()
+    try:
+        from app.models.user import User
+
+        user = db.query(User).filter(User.username == "accountant01").first()
+        db.delete(user)
+        db.commit()
+    finally:
+        db.close()
+
+    assert client.get("/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+
+
+def test_role_change_takes_effect_immediately(client, login, db_session_factory):
+    """Demote accountant01 → employee; the next request must see the new role."""
+    token = login("accountant01")
+    body = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"}).json()
+    assert body["role"] == "accountant"
+
+    db = db_session_factory()
+    try:
+        from app.models.user import Role, User
+
+        user = db.query(User).filter(User.username == "accountant01").first()
+        employee_role = db.query(Role).filter(Role.name == "employee").first()
+        user.role_id = employee_role.id
+        db.commit()
+    finally:
+        db.close()
+
+    body = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"}).json()
+    assert body["role"] == "employee"

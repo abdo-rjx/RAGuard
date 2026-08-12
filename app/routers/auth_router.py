@@ -1,5 +1,5 @@
 """POST /auth/login and GET /auth/me."""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import CurrentUser, get_current_user
@@ -8,13 +8,15 @@ from app.auth.password import verify_password
 from app.audit.logger import write_audit_event
 from app.database import get_db
 from app.models.user import User
+from app.rate_limit import limiter
 from app.schemas.auth import LoginRequest, LoginResponse, UserInfo
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
+@limiter.limit("10/minute")  # brute-force protection; disabled when ENVIRONMENT=test
+def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
     user = db.query(User).filter(User.username == body.username).first()
 
     if user is None or not verify_password(body.password, user.hashed_password):

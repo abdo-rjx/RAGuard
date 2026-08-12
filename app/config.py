@@ -2,7 +2,9 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -19,7 +21,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # Auth
-    JWT_SECRET_KEY: str = "changeme-generate-a-real-secret"
+    JWT_SECRET_KEY: str = Field(..., min_length=1)
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60
 
@@ -34,8 +36,23 @@ class Settings(BaseSettings):
     # Embeddings
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
 
+    # Environment
+    ENVIRONMENT: str = "development"
+
     # Policy
     POLICY_YAML_PATH: Path = BASE_DIR / "app" / "policy" / "policies.yaml"
+
+    @field_validator("JWT_SECRET_KEY")
+    @classmethod
+    def validate_jwt_secret_key(cls, v: str) -> str:
+        insecure_default = "changeme-generate-a-real-secret"
+        if v == insecure_default:
+            raise ValueError(
+                "JWT_SECRET_KEY must be set to a secure value in environment variables. "
+                "The default value is insecure and must be changed. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+            )
+        return v
 
     @property
     def uploads_dir(self) -> Path:

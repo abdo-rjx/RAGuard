@@ -3,6 +3,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.audit.logger import write_audit_event
@@ -129,9 +130,26 @@ def list_documents(
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[DocumentInfo]:
-    # Filter to the departments the caller's role may access (plan Section 12).
-    allowed = set(get_policy_engine().allowed_departments(user.role))
-    docs = db.query(Document).join(Department).filter(Department.name.in_(allowed)).order_by(Document.uploaded_at.desc()).all()
+    # Filter to the departments AND classifications the caller's role may access
+    # (plan Section 12) — the same policy as the retrieval path, so the listing
+    # never reveals documents above the caller's ceiling.
+    policy = get_policy_engine()
+    clauses = [
+        and_(
+            Department.name == dept,
+            Document.classification.in_(policy.allowed_classifications(user.role, dept)),
+        )
+        for dept in policy.allowed_departments(user.role)
+    ]
+    if not clauses:
+        return []
+    docs = (
+        db.query(Document)
+        .join(Department)
+        .filter(or_(*clauses))
+        .order_by(Document.uploaded_at.desc())
+        .all()
+    )
     return [DocumentInfo(**d.as_dict()) for d in docs]
 
 
