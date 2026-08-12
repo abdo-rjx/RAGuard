@@ -105,6 +105,7 @@ function showApp() {
   $("user-role").textContent = `${user.role} · ${user.department}` + (user.is_admin ? " · admin" : "");
   $("user-avatar").textContent = user.username.slice(0, 2);
   $("admin-tab").hidden = !user.is_admin;
+  $("security-tab").hidden = !user.is_admin;
   switchTab("chat");
   renderAccessCard();
   checkLLM();
@@ -114,7 +115,9 @@ function switchTab(name) {
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   $("tab-chat").style.display = name === "chat" ? "contents" : "none";
   $("tab-admin").hidden = name !== "admin";
+  $("tab-security").hidden = name !== "security";
   if (name === "admin") renderAdmin();
+  if (name === "security") renderSecurityTab();
   if (name === "chat") $("chat-input").focus();
 }
 
@@ -424,10 +427,62 @@ async function renderAudit() {
   }
 }
 
+/* ---------- admin: security events ---------- */
+
+let secPage = 1;
+const SEC_PAGE_SIZE = 25;
+
+function secQuery() {
+  const p = new URLSearchParams();
+  const user = $("sec-user").value.trim();
+  const action = $("sec-action").value;
+  if (user) p.set("user", user);
+  if (action) p.set("action", action);
+  p.set("page", secPage);
+  p.set("page_size", SEC_PAGE_SIZE);
+  return p;
+}
+
+async function renderSecurity() {
+  const body = $("sec-body");
+  body.innerHTML = `<tr class="empty-row"><td colspan="5">Loading…</td></tr>`;
+  try {
+    const qs = secQuery();
+    const data = await api(`/security/events?${qs}`);
+    const items = data.items || [];
+    $("sec-page-info").textContent =
+      data.total ? `Page ${secPage} · ${data.total} total` : "0 events";
+
+    if (!items.length) {
+      body.innerHTML = `<tr class="empty-row"><td colspan="5">No security events match your filters.</td></tr>`;
+    } else {
+      body.innerHTML = items.map((e) => `
+        <tr>
+          <td class="mono">${fmtTime(e.timestamp)}</td>
+          <td>${escapeHtml(e.username || "—")}</td>
+          <td class="act">${escapeHtml(e.action)}</td>
+          <td>${e.decision ? `<span class="badge badge-${escapeHtml(e.decision)}">${escapeHtml(e.decision)}</span>` : "—"}</td>
+          <td class="mono" style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-3);"
+              title="${escapeHtml(e.reason || e.query_text || "")}">
+            ${escapeHtml((e.reason || e.query_text || "").slice(0, 80))}
+          </td>
+        </tr>`).join("");
+    }
+    $("sec-prev").disabled = secPage <= 1;
+    $("sec-next").disabled = !data.total || secPage * SEC_PAGE_SIZE >= data.total;
+  } catch (err) {
+    body.innerHTML = `<tr class="empty-row"><td colspan="5">${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
 /* ---------- admin: shared ---------- */
 
 async function renderAdmin() {
   await Promise.all([loadDocs(), renderAudit()]);
+}
+
+async function renderSecurityTab() {
+  await renderSecurity();
 }
 
 /* ---------- wire up ---------- */
@@ -519,6 +574,16 @@ function initEvents() {
   });
   $("audit-prev").addEventListener("click", () => { if (auditPage > 1) { auditPage--; renderAudit(); } });
   $("audit-next").addEventListener("click", () => { auditPage++; renderAudit(); });
+
+  $("sec-apply").addEventListener("click", () => { secPage = 1; renderSecurity(); });
+  $("sec-clear").addEventListener("click", () => {
+    $("sec-user").value = "";
+    $("sec-action").value = "";
+    secPage = 1;
+    renderSecurity();
+  });
+  $("sec-prev").addEventListener("click", () => { if (secPage > 1) { secPage--; renderSecurity(); } });
+  $("sec-next").addEventListener("click", () => { secPage++; renderSecurity(); });
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("upload-modal").hidden) closeUpload();

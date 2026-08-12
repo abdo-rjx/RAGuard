@@ -92,6 +92,7 @@
       <nav>
         <button class="tab active" data-tab="chat">Chat</button>
         <button class="tab" data-tab="admin" id="admin-tab" hidden>Admin</button>
+        <button class="tab" data-tab="security" id="security-tab" hidden>Security</button>
       </nav>
       <div class="user-chip">
         <div class="who">
@@ -241,9 +242,55 @@
         </div>
       </div>
     </div>
-  </div>
+        </div>
 
-  <!-- Upload modal -->
+        <!-- ---------- SECURITY ---------- -->
+        <div id="tab-security" class="tab-panel admin-main" hidden>
+          <div class="admin-inner">
+            <div class="page-head">
+              <div>
+                <h1>Security Events</h1>
+                <p>Filtered view: only events with decision=DENY or action types INJECTION_*, OUTPUT_*, ACCESS_DENIED.</p>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="filter-bar">
+                <input id="sec-user" class="input" type="text" placeholder="Username" />
+                <select id="sec-action" class="select">
+                  <option value="">All security actions</option>
+                  <option>ACCESS_DENIED</option>
+                  <option>INJECTION_SUSPECTED_QUERY</option>
+                  <option>INJECTION_SUSPECTED_CONTEXT</option>
+                  <option>OUTPUT_BLOCKED</option>
+                </select>
+                <button class="btn btn-secondary" id="sec-apply">Apply filters</button>
+                <button class="btn btn-ghost" id="sec-clear">Reset</button>
+              </div>
+              <div class="table-wrap">
+                <table class="data">
+                  <thead>
+                    <tr>
+                      <th>Timestamp</th>
+                      <th>User</th>
+                      <th>Action</th>
+                      <th>Decision</th>
+                      <th>Reason / query</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sec-body"></tbody>
+                </table>
+              </div>
+              <div class="pager">
+                <span id="sec-page-info"></span>
+                <button class="btn btn-secondary" id="sec-prev">← Prev</button>
+                <button class="btn btn-secondary" id="sec-next">Next →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upload modal -->
   <div id="upload-modal" class="modal-backdrop" hidden>
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="upload-title">
       <div class="modal-head">
