@@ -76,6 +76,27 @@ def test_chat_never_leaks_unauthorized_department(monkeypatch, client, login, po
     assert body["sources"][0]["document_id"] == 101
 
 
+def test_chat_no_context_returns_canned_answer(monkeypatch, client, login, policy_engine):
+    """Empty retrieval → deterministic \"I don't know\" without calling the LLM,
+    so a small model can never invent a generic answer from outside knowledge."""
+    _patch_retrieval(monkeypatch, policy_engine, [])  # nothing retrieved at all
+    calls = {"n": 0}
+
+    def must_not_be_called(system_prompt, user_prompt):
+        calls["n"] += 1
+        raise AssertionError("LLM must not be called when no context is retrieved")
+
+    monkeypatch.setattr("app.routers.chat_router.stream_chat", must_not_be_called)
+
+    token = login("accountant01")
+    r = client.post("/chat", headers=_auth(token), json={"message": "What is the meaning of life?"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["answer"] == "I don't have information about that."
+    assert body["sources"] == []
+    assert calls["n"] == 0
+
+
 def test_chat_requires_auth(client):
     assert client.post("/chat", json={"message": "hello"}).status_code == 401
 

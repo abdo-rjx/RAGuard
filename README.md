@@ -86,7 +86,8 @@ Sample documents (`scripts/seed_data.py` → `data/sample_docs/`): revenue repor
 2. **Policy-built Chroma filter.** `PolicyEngine.build_chroma_filter(role)` emits a `$or` of `$and(department, classification IN [...])` clauses so the vector DB itself only returns what the role may see.
 3. **Defense-in-depth re-check.** Every chunk Chroma returns is re-validated against `PolicyEngine.can_access_document(...)` in plain Python. In correct operation this drops nothing — it exists so a filter bug, metadata typo, or future refactor can never silently leak a chunk. *This is what `test_retrieval_isolation.py` verifies by inspecting the chunk list itself, not just the final answer.*
 4. **Prompt-injection heuristics** (`app/security/`) log suspicious queries/chunks but never gate access — the retriever is the guard, not the user's words. Output-guard redacts secret-like content from LLM responses before they return to the client.
-5. **Audit logging** records every decision: logins, queries, uploads/deletes, denied chunks, and suspected injection/output events.
+5. **No-context = no answer.** If retrieval returns zero chunks, `/chat` replies with a fixed `"I don't have information about that."` without calling the LLM at all; the system prompt also tells small models (e.g. `qwen2:1.5b`) to reply with that exact sentence when the retrieved docs don't answer the question. A weak model can't improvise a generic answer from outside knowledge.
+6. **Audit logging** records every decision: logins, queries, uploads/deletes, denied chunks, and suspected injection/output events.
 
 ## Additional features (beyond the MVP plan)
 
