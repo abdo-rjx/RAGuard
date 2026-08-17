@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import CurrentUser, require_admin
+from app.auth.dependencies import CurrentUser, require_security_admin
 from app.database import get_db
 from app.models.audit_log import AuditLog
 from app.schemas.audit import AuditLogInfo, AuditLogPage
@@ -53,16 +53,17 @@ def audit_logs(
     date_to: datetime | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=500),
-    admin: CurrentUser = Depends(require_admin),
+    admin: CurrentUser = Depends(require_security_admin),
     db: Session = Depends(get_db),
 ) -> AuditLogPage:
     clauses = _build_filters(user, decision, date_from, date_to, security_only=False)
 
-    total = db.query(AuditLog).filter(and_(*clauses)).count() if clauses else db.query(AuditLog).count()
+    query = db.query(AuditLog)
+    if clauses:
+        query = query.filter(and_(*clauses))
+    total = query.count()
     rows = (
-        db.query(AuditLog)
-        .filter(and_(*clauses))
-        .order_by(AuditLog.timestamp.desc())
+        query.order_by(AuditLog.timestamp.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
@@ -78,16 +79,17 @@ def security_events(
     date_to: datetime | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=500),
-    admin: CurrentUser = Depends(require_admin),
+    admin: CurrentUser = Depends(require_security_admin),
     db: Session = Depends(get_db),
 ) -> AuditLogPage:
     clauses = _build_filters(user, decision, date_from, date_to, security_only=True)
 
-    total = db.query(AuditLog).filter(and_(*clauses)).count()
+    query = db.query(AuditLog)
+    if clauses:
+        query = query.filter(and_(*clauses))
+    total = query.count()
     rows = (
-        db.query(AuditLog)
-        .filter(and_(*clauses))
-        .order_by(AuditLog.timestamp.desc())
+        query.order_by(AuditLog.timestamp.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()

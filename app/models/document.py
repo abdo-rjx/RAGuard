@@ -21,6 +21,10 @@ class Document(Base):
     )
     # JSON list of Chroma chunk IDs — enables deleting a doc's chunks later
     chroma_chunk_ids: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    # Ingestion state (feature A3): "success" (default) or "failed" + reason,
+    # surfaced via GET /documents/{id}/status.
+    ingestion_status: Mapped[str] = mapped_column(String(16), default="success", nullable=False)
+    ingestion_error: Mapped[str | None] = mapped_column(String, nullable=True)
 
     department: Mapped["Department"] = relationship(back_populates="documents")
     owner: Mapped["User"] = relationship()
@@ -33,4 +37,6 @@ class Document(Base):
             "classification": self.classification,
             "uploaded_at": self.uploaded_at.isoformat() if self.uploaded_at else None,
             "chunk_count": len(self.chroma_chunk_ids or []),
+            "ingestion_status": self.ingestion_status,
+            "ingestion_error": self.ingestion_error,
         }

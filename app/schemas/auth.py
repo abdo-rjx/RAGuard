@@ -1,5 +1,5 @@
 """Auth request/response models."""
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class LoginRequest(BaseModel):
@@ -12,7 +12,8 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     role: str
     department: str
-    is_admin: bool
+    is_system_admin: bool
+    is_security_admin: bool
 
 
 class UserInfo(BaseModel):
@@ -20,4 +21,17 @@ class UserInfo(BaseModel):
     username: str
     role: str
     department: str
-    is_admin: bool
+    is_system_admin: bool
+    is_security_admin: bool
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class QueryHistoryItem(BaseModel):
+    query_text: str
+    timestamp: str | None = None
+    decision: str | None = None
+    reason: str | None = None

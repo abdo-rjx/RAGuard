@@ -102,10 +102,17 @@ function showApp() {
   $("login-view").hidden = true;
   $("app-view").hidden = false;
   $("user-name").textContent = user.username;
-  $("user-role").textContent = `${user.role} · ${user.department}` + (user.is_admin ? " · admin" : "");
+  const roleLabel =
+    user.is_system_admin && user.is_security_admin ? " · system + security admin" :
+    user.is_system_admin ? " · system admin" :
+    user.is_security_admin ? " · security admin" : "";
+  $("user-role").textContent = `${user.role} · ${user.department}` + roleLabel;
   $("user-avatar").textContent = user.username.slice(0, 2);
-  $("admin-tab").hidden = !user.is_admin;
-  $("security-tab").hidden = !user.is_admin;
+  // Feature A1 — separation of duties: system admins get the Admin tab
+  // (documents + guard patterns); security admins get the Security tab
+  // (audit logs + events + alerts + reports).
+  $("admin-tab").hidden = !user.is_system_admin;
+  $("security-tab").hidden = !user.is_security_admin;
   switchTab("chat");
   renderAccessCard();
   checkLLM();
@@ -168,6 +175,7 @@ function addMsg(role, html) {
       <div class="col">
         <div class="label">RAGGuard</div>
         <div class="bubble">${html}</div>
+        <div class="feedback-row"></div>
       </div>`;
   } else {
     wrap.innerHTML = `<div class="bubble">${html}</div>`;
@@ -175,6 +183,32 @@ function addMsg(role, html) {
   $("thread-inner").appendChild(wrap);
   scrollThread();
   return wrap;
+}
+
+/* Feature B3 — feedback: helpful / not helpful / report as security concern. */
+function attachFeedback(wrap, query) {
+  const row = wrap.querySelector(".feedback-row");
+  if (!row) return;
+  row.innerHTML = `
+    <button class="fb" data-fb="thumbs_up" title="Helpful">👍</button>
+    <button class="fb" data-fb="thumbs_down" title="Not helpful">👎</button>
+    <button class="fb fb-alert" data-fb="security_concern" title="Report as security concern">🚩</button>`;
+  row.querySelectorAll("[data-fb]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
+        await api("/chat/feedback", {
+          method: "POST",
+          body: JSON.stringify({ message: query, feedback: btn.dataset.fb }),
+        });
+        toast(btn.dataset.fb === "security_concern" ? "Reported as security concern" : "Thanks for your feedback", "ok");
+      } catch (err) {
+        toast(err.message, "error");
+        btn.disabled = false;
+      }
+    });
+  });
 }
 
 function scrollThread() {
@@ -235,7 +269,8 @@ async function sendChat() {
   try {
     const body = await api("/chat", { method: "POST", body: JSON.stringify({ message }) });
     typing.remove();
-    addMsg("assistant", renderAssistant(body));
+    const wrap = addMsg("assistant", renderAssistant(body));
+    attachFeedback(wrap, message);
     convCount++;
     addRecentConv(message);
   } catch (err) {
@@ -300,7 +335,7 @@ function renderDocs() {
   const body = $("docs-body");
 
   if (!rows.length) {
-    body.innerHTML = `<tr class="empty-row"><td colspan="6">No documents match your filters.</td></tr>`;
+    body.innerHTML = `<tr class="empty-row"><td colspan="7">No documents match your filters.</td></tr>`;
     return;
   }
 
@@ -310,6 +345,7 @@ function renderDocs() {
       <td><span class="dept-badge">${escapeHtml(d.department)}</span></td>
       <td><span class="badge badge-${escapeHtml(d.classification)}">${escapeHtml(d.classification)}</span></td>
       <td>${d.chunk_count}</td>
+      <td>${d.ingestion_status === "failed" ? `<span class="badge badge-DENY" title="${escapeHtml(d.ingestion_error || "")}">failed</span>` : `<span class="badge badge-ALLOW">ok</span>`}</td>
       <td>${fmtTime(d.uploaded_at)}</td>
       <td>
         <div class="row-actions">
@@ -478,11 +514,138 @@ async function renderSecurity() {
 /* ---------- admin: shared ---------- */
 
 async function renderAdmin() {
-  await Promise.all([loadDocs(), renderAudit()]);
+  await Promise.all([loadDocs(), loadPatterns()]);
 }
 
 async function renderSecurityTab() {
-  await renderSecurity();
+  await Promise.all([renderSecurity(), renderAlerts(), renderReports()]);
+}
+
+/* ---------- system admin: guard patterns (A4) ---------- */
+
+let patternsCache = [];
+
+async function loadPatterns() {
+  try {
+    patternsCache = await api("/security/patterns");
+  } catch (err) {
+    patternsCache = [];
+    toast(err.message, "error");
+  }
+  renderPatterns();
+}
+
+function renderPatterns() {
+  const q = ($("pat-search").value || "").toLowerCase();
+  const t = $("pat-type-filter").value;
+  const rows = patternsCache.filter((p) =>
+    (!q || p.pattern.toLowerCase().includes(q)) && (!t || p.type === t)
+  );
+  const body = $("pat-body");
+  if (!rows.length) {
+    body.innerHTML = `<tr class="empty-row"><td colspan="4">No patterns match your filters.</td></tr>`;
+    return;
+  }
+  body.innerHTML = rows.map((p) => `
+    <tr>
+      <td class="mono" title="${escapeHtml(p.pattern)}">${escapeHtml(p.pattern)}</td>
+      <td><span class="dept-badge">${escapeHtml(p.type)}</span></td>
+      <td>${p.active ? `<span class="badge badge-ALLOW">active</span>` : `<span class="badge badge-DENY">inactive</span>`}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn btn-secondary btn-sm" data-toggle="${p.id}">${p.active ? "Deactivate" : "Activate"}</button>
+          <button class="btn btn-danger btn-sm" data-delpat="${p.id}" data-pat="${escapeHtml(p.pattern)}">Delete</button>
+        </div>
+      </td>
+    </tr>`).join("");
+  body.querySelectorAll("[data-toggle]").forEach((btn) => {
+    btn.onclick = () => togglePattern(btn.dataset.toggle);
+  });
+  body.querySelectorAll("[data-delpat]").forEach((btn) => {
+    btn.onclick = () => deletePattern(btn.dataset.delpat, btn.dataset.pat);
+  });
+}
+
+async function togglePattern(id) {
+  const p = patternsCache.find((x) => x.id === Number(id));
+  if (!p) return;
+  try {
+    await api(`/security/patterns/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ pattern: p.pattern, type: p.type, active: !p.active }),
+    });
+    await loadPatterns();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function deletePattern(id, pat) {
+  if (!confirm(`Delete guard pattern "${pat}"?`)) return;
+  try {
+    await api(`/security/patterns/${id}`, { method: "DELETE" });
+    await loadPatterns();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function addPattern() {
+  const type = prompt("Pattern type?", "injection");
+  if (!type) return;
+  const pattern = prompt("Regex pattern:");
+  if (!pattern) return;
+  try {
+    await api("/security/patterns", { method: "POST", body: JSON.stringify({ pattern, type }) });
+    await loadPatterns();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+/* ---------- security admin: alerts (A5) + reports (A6) ---------- */
+
+async function renderAlerts() {
+  const body = $("alerts-body");
+  try {
+    const items = await api("/security/alerts");
+    $("alerts-count").textContent = items.length;
+    if (!items.length) {
+      body.innerHTML = `<tr class="empty-row"><td colspan="4">No users currently flagged.</td></tr>`;
+      return;
+    }
+    body.innerHTML = items.map((a) => `
+      <tr>
+        <td class="mono">${fmtTime(a.created_at)}</td>
+        <td>${escapeHtml(a.username || "—")}${a.user_id ? ` <span class="did">#${a.user_id}</span>` : ""}</td>
+        <td class="act">${escapeHtml(a.event_action)}</td>
+        <td><span class="badge badge-DENY">${a.event_count}</span></td>
+      </tr>`).join("");
+  } catch (err) {
+    body.innerHTML = `<tr class="empty-row"><td colspan="4">${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function renderReports() {
+  const body = $("reports-body");
+  try {
+    const data = await api("/security/reports?page_size=50");
+    const items = data.items || [];
+    $("reports-count").textContent = data.total || 0;
+    if (!items.length) {
+      body.innerHTML = `<tr class="empty-row"><td colspan="4">No security reports submitted.</td></tr>`;
+      return;
+    }
+    body.innerHTML = items.map((e) => `
+      <tr>
+        <td class="mono">${fmtTime(e.timestamp)}</td>
+        <td>${escapeHtml(e.username || "—")}</td>
+        <td class="mono" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(e.query_text || "")}">${escapeHtml((e.query_text || "").slice(0, 80))}</td>
+        <td class="mono" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(e.reason || "")}">${escapeHtml((e.reason || "").slice(0, 80))}</td>
+      </tr>`).join("");
+  } catch (err) {
+    body.innerHTML = `<tr class="empty-row"><td colspan="4">${escapeHtml(err.message)}</td></tr>`;
+  }
 }
 
 /* ---------- wire up ---------- */
@@ -564,6 +727,9 @@ function initEvents() {
   $("doc-search").addEventListener("input", renderDocs);
   $("doc-dept-filter").addEventListener("change", renderDocs);
   $("doc-class-filter").addEventListener("change", renderDocs);
+  $("pat-search").addEventListener("input", renderPatterns);
+  $("pat-type-filter").addEventListener("change", renderPatterns);
+  $("pat-add-btn").addEventListener("click", addPattern);
   $("audit-apply").addEventListener("click", () => { auditPage = 1; renderAudit(); });
   $("audit-clear").addEventListener("click", () => {
     $("audit-user").value = "";

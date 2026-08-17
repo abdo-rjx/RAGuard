@@ -52,6 +52,13 @@ class PolicyEngine:
         """Deterministic yes/no: does `role` have access to this department/classification?"""
         return classification in self.allowed_classifications(role, department)
 
+    def simulate_access(self, role: str, department: str, classification: str) -> bool:
+        """Feature A2 — thin wrapper over can_access_document used by the admin
+        "Permission Preview" endpoint. No new logic; exposes the same deterministic
+        check so an admin can answer "would user X see document Y?" without logging
+        in as that user."""
+        return self.can_access_document(role, department, classification)
+
     # -- Chroma filter ---------------------------------------------------------
 
     def build_chroma_filter(self, role: str) -> dict:

@@ -39,14 +39,18 @@ Every user's password is `Password123!`.
 
 | Username      | Role               | Home dept | Can see (per YAML policy) |
 |---------------|--------------------|-----------|---------------------------|
-| `ceo01`       | ceo (admin)        | executive | everything (TOP_SECRET)   |
+| `ceo01`       | ceo (system admin) | executive | everything (TOP_SECRET)   |
 | `cfo01`       | cfo                | finance   | finance, hr, executive    |
 | `cto01`       | cto                | it        | it, security, executive   |
 | `hr01`        | hr_manager         | hr        | hr                        |
-| `seceng01`    | security_engineer (admin) | security | security            |
+| `seceng01`    | security_engineer (security admin) | security | security      |
 | `iteng01`     | it_engineer        | it        | it                        |
 | `accountant01`| accountant         | finance   | finance                   |
 | `employee01`  | employee           | general   | general (PUBLIC)          |
+
+Admin powers are split (feature A1 — separation of duties): `ceo01` is a **System
+Admin** (documents, guard patterns, policy preview) and `seceng01` is a **Security
+Admin** (audit logs, security events, alerts, reports). Neither can do the other's job.
 
 Sample documents (`scripts/seed_data.py` → `data/sample_docs/`): revenue report (finance/CONFIDENTIAL), network architecture (it/INTERNAL), company overview (general/PUBLIC), employee salaries (hr/CONFIDENTIAL), security incident (security/RESTRICTED), acquisition strategy (executive/TOP_SECRET).
 
@@ -56,12 +60,21 @@ Sample documents (`scripts/seed_data.py` → `data/sample_docs/`): revenue repor
 |---|---|---|
 | `POST /auth/login` | none | `{username, password}` → JWT |
 | `GET /auth/me` | required | identity from token |
-| `POST /chat` | required | RAG chat — `{message}` → `{answer, sources}` |
-| `POST /documents` | admin | multipart upload: file + `department` + `classification` |
+| `POST /chat` | required | RAG chat — `{message}` → `{answer, sources, conversation_id}` |
+| `POST /chat/feedback` | required | thumbs up/down, or `security_concern` (B3) |
+| `GET /conversations` · `GET /conversations/{id}` | required | own chat threads (B1) |
+| `GET /auth/me/queries` | required | own query history (B4) |
+| `POST /auth/me/password` | required | change own password (B4) |
+| `POST /documents` | system admin | multipart upload: file + `department` + `classification` |
 | `GET /documents` | required | list, filtered to the caller's allowed departments |
-| `DELETE /documents/{id}` | admin | delete doc + its Chroma chunks |
-| `GET /audit/logs` | admin | audit trail (filters: `user`, `decision`, `date_from`, `date_to`, paginated) |
-| `GET /security/events` | admin | DENY + injection/output events |
+| `GET /documents/{id}/status` | required | ingestion status + chunk ids (A3) |
+| `DELETE /documents/{id}` | system admin | delete doc + its Chroma chunks |
+| `GET /policy/simulate` | system admin | permission preview: would role X see dept/Y (A2) |
+| `GET /security/patterns` · `POST/PATCH/DELETE` | system admin | DB-backed guard patterns (A4) |
+| `GET /audit/logs` | security admin | audit trail (filters: `user`, `decision`, `date_from`, `date_to`, paginated) |
+| `GET /security/events` | security admin | DENY + injection/output events |
+| `GET /security/alerts` | security admin | anomaly-flagged users (A5) |
+| `GET /security/reports` | security admin | user-submitted security concerns (A6/B3) |
 
 ## How the security guarantee holds
 
@@ -71,13 +84,42 @@ Sample documents (`scripts/seed_data.py` → `data/sample_docs/`): revenue repor
 4. **Prompt-injection heuristics** (`app/security/`) log suspicious queries/chunks but never gate access — the retriever is the guard, not the user's words. Output-guard redacts secret-like content from LLM responses before they return to the client.
 5. **Audit logging** records every decision: logins, queries, uploads/deletes, denied chunks, and suspected injection/output events.
 
+## Additional features (beyond the MVP plan)
+
+These extend the phases of `plan(2).md` with patterns from production permission-aware AI systems:
+
+- **A1 — Admin role split.** `is_admin` became `is_system_admin` + `is_security_admin`. System admins manage documents, guard patterns and policy preview; security admins read audit logs, events, alerts and reports. Separation of duties: no single demo account holds both powers.
+- **A2 — Permission Preview.** `GET /policy/simulate?role=&department=&classification=` answers "would this role see this document?" via `PolicyEngine.simulate_access()` (a thin wrapper over the retrieval-time check).
+- **A3 — Ingestion status.** `GET /documents/{id}/status` exposes `success`/`failed` + reason, chunk count, and `chroma_chunk_ids`; uploads that fail mid-pipeline leave a traceable `failed` record.
+- **A4 — Editable guard patterns.** `INJECTION_PATTERNS`/`LEAK_PATTERNS` moved from hardcoded lists into the `guard_patterns` table. System admins CRUD them via `/security/patterns`; the guards load active patterns from the DB with an in-memory cache refreshed on change (built-in defaults seed the table at first boot and act as a fallback).
+- **A5 — Anomaly flagging.** The audit layer counts `ACCESS_DENIED` + `INJECTION_SUSPECTED_*` events per user per 10 minutes; crossing 5 writes a `SecurityAlert` ("⚠️ needs review") visible at `GET /security/alerts`. Non-ML, inline, never raises.
+- **A6 / B3 — Security reports.** `POST /chat/feedback` accepts `thumbs_up`/`thumbs_down` (→ `CHAT_FEEDBACK`) or `security_concern` (→ `USER_REPORTED_SECURITY_CONCERN`). The latter is a high-priority signal surfaced separately at `GET /security/reports`, distinct from generic quality feedback.
+- **B1 — Multi-turn conversations.** `Conversation` + `Message` tables; `POST /chat` accepts an optional `conversation_id`, persists each turn with its sources, and includes prior turns in the LLM prompt. `GET /conversations` lists the caller's own threads (ownership enforced).
+- **B2 — Classification badges on sources.** Each item in `sources` carries its `classification` (already chunk metadata), so the UI can badge answers as e.g. CONFIDENTIAL without exposing content.
+- **B4 — Self-service.** `GET /auth/me/queries` (own chat history only) and `POST /auth/me/password` (verify current password, then change).
+
+**Design decision — silent exclusion stays the default (B2).** When a query touches a document the user cannot access, the user sees no indication a restricted document exists at all (the current MVP behavior). The alternative — telling the user "1 restricted result was found" — can itself leak that a sensitive document exists, so it is deliberately not implemented. This is a reversible choice, not an oversight: swap the re-check's silent drop for an acknowledged-restriction message in `secure_retriever.py` if a product decision ever calls for it.
+
+## Security hardening (audit results)
+
+Findings from a full-codebase security review, all fixed:
+
+- **Upload memory DoS** — `POST /documents` buffered the whole file into memory with no size cap. Now rejects >10 MB with `413` (checked via Content-Length *and* a capped read) before any extraction.
+- **Chat/LLM DoS** — `/chat`, `/chat/feedback`, and `/auth/me/password` were unthrottled (each chat call hits Chroma + Ollama). Added slowapi limits (`30/min`, `20/min`, `10/min`); login already had `10/min`.
+- **Missing security headers** — added a middleware setting `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and a CSP (`default-src 'self'`, `script-src 'self'`, `frame-ancestors 'none'`) on every response.
+- **Username-enumeration timing side channel** — login now runs a bcrypt verify against a dummy hash when the username doesn't exist, so latency no longer reveals whether an account is registered.
+- **Stale tokens after password change** — passwords changed but old JWTs kept working. Added `User.token_version`, embedded as the `ver` claim; every request checks it, and `POST /auth/me/password` bumps it, revoking all outstanding tokens immediately.
+- **Log injection** — free-text audit fields (`query_text`, `username`, `reason`) are stripped of control characters so a malicious query can't forge lines in the exported audit trail.
+
+Design-level tradeoffs (documented, not "bugs"): the bearer token lives in `localStorage` (XSS-storage tradeoff typical of SPAs — worth revisiting with httpOnly cookies if the threat model tightens), and the prompt-injection / leak guards are heuristic by design (the retriever is the real authorization gate).
+
 ## Tests
 
 ```bash
 pytest
 ```
 
-35 tests including the full role × department × classification isolation matrix — a `FakeVectorStore` returns *everything* (simulating a broken filter) and asserts the re-check still lets nothing unauthorized through.
+90 tests including the full role × department × classification isolation matrix — a `FakeVectorStore` returns *everything* (simulating a broken filter) and asserts the re-check still lets nothing unauthorized through — plus coverage for the features above: admin role gating, permission preview, ingestion status, DB-backed patterns, anomaly alerts, conversations, feedback/reports, and self-service.
 
 ## Project layout
 

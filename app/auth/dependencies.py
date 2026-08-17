@@ -26,7 +26,8 @@ class CurrentUser:
     username: str
     role: str
     department: str
-    is_admin: bool
+    is_system_admin: bool
+    is_security_admin: bool
 
     @property
     def department_id(self) -> int:
@@ -71,20 +72,41 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Token revocation: a token is only valid while its `ver` claim matches the
+    # user's current token_version (bumped on password change).
+    if payload.get("ver") != user.token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked — please sign in again",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return CurrentUser(
         id=user.id,
         username=user.username,
         role=user.role.name if user.role else "",
         department=user.department.name if user.department else "",
-        is_admin=user.is_admin,
+        is_system_admin=user.is_system_admin,
+        is_security_admin=user.is_security_admin,
     )
 
 
-def require_admin(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
-    if not user.is_admin:
+def require_system_admin(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    """System Admin (A1): manages documents, policy/config, guard patterns."""
+    if not user.is_system_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required",
+            detail="System admin privileges required",
+        )
+    return user
+
+
+def require_security_admin(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    """Security Admin (A1): reads audit logs, security events, alerts, reports."""
+    if not user.is_security_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Security admin privileges required",
         )
     return user
 

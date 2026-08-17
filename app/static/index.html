@@ -180,6 +180,7 @@
                   <th>Department</th>
                   <th>Classification</th>
                   <th>Chunks</th>
+                  <th>Status</th>
                   <th>Uploaded</th>
                   <th>Actions</th>
                 </tr>
@@ -189,8 +190,47 @@
           </div>
         </div>
 
-        <!-- Audit logs -->
+        <!-- Guard patterns (A4) -->
         <div class="page-head" style="margin-top:36px;">
+          <div>
+            <h1>Guard patterns</h1>
+            <p>DB-backed injection / leak detection rules. Changes apply immediately.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="filter-bar">
+            <input id="pat-search" class="input grow" type="text" placeholder="Filter patterns…" />
+            <select id="pat-type-filter" class="select">
+              <option value="">All types</option>
+              <option value="injection">injection</option>
+              <option value="leak">leak</option>
+            </select>
+            <button class="btn btn-primary" id="pat-add-btn">Add pattern</button>
+          </div>
+          <div class="table-wrap">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>Pattern</th>
+                  <th>Type</th>
+                  <th>Active</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pat-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- SECURITY ---------- -->
+    <div id="tab-security" class="tab-panel admin-main" hidden>
+      <div class="admin-inner">
+
+        <!-- Audit logs -->
+        <div class="page-head">
           <div>
             <h1>Audit logs</h1>
             <p>Every login, query and access decision is recorded. Security events are highlighted.</p>
@@ -205,12 +245,15 @@
               <option>LOGIN</option>
               <option>LOGIN_FAILED</option>
               <option>CHAT_QUERY</option>
+              <option>CHAT_FEEDBACK</option>
+              <option>USER_REPORTED_SECURITY_CONCERN</option>
               <option>DOCUMENT_UPLOAD</option>
               <option>DOCUMENT_DELETE</option>
               <option>ACCESS_DENIED</option>
               <option>INJECTION_SUSPECTED_QUERY</option>
               <option>INJECTION_SUSPECTED_CONTEXT</option>
               <option>OUTPUT_BLOCKED</option>
+              <option>PASSWORD_CHANGED</option>
             </select>
             <select id="audit-decision" class="select">
               <option value="">Any decision</option>
@@ -240,21 +283,16 @@
             <button class="btn btn-secondary" id="audit-next">Next →</button>
           </div>
         </div>
-      </div>
-    </div>
+
+        <!-- Security events -->
+        <div class="page-head" style="margin-top:36px;">
+          <div>
+            <h1>Security Events</h1>
+            <p>Filtered view: only events with decision=DENY or action types INJECTION_*, OUTPUT_*, ACCESS_DENIED.</p>
+          </div>
         </div>
 
-        <!-- ---------- SECURITY ---------- -->
-        <div id="tab-security" class="tab-panel admin-main" hidden>
-          <div class="admin-inner">
-            <div class="page-head">
-              <div>
-                <h1>Security Events</h1>
-                <p>Filtered view: only events with decision=DENY or action types INJECTION_*, OUTPUT_*, ACCESS_DENIED.</p>
-              </div>
-            </div>
-
-            <div class="card">
+        <div class="card">
               <div class="filter-bar">
                 <input id="sec-user" class="input" type="text" placeholder="Username" />
                 <select id="sec-action" class="select">
@@ -287,6 +325,52 @@
                 <button class="btn btn-secondary" id="sec-next">Next →</button>
               </div>
             </div>
+
+        <!-- Security alerts (A5) -->
+        <div class="page-head" style="margin-top:36px;">
+          <div>
+            <h1>Security alerts <span class="count" id="alerts-count">0</span></h1>
+            <p>Users flagged “needs review” — more than 5 denied / injection-suspected events within 10 minutes.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>Flagged</th>
+                  <th>User</th>
+                  <th>Trigger</th>
+                  <th>Events</th>
+                </tr>
+              </thead>
+              <tbody id="alerts-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Security reports (A6) -->
+        <div class="page-head" style="margin-top:36px;">
+          <div>
+            <h1>Security reports <span class="count" id="reports-count">0</span></h1>
+            <p>User-submitted “report as security concern” — high priority, kept separate from general feedback.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>Reported</th>
+                  <th>User</th>
+                  <th>Query</th>
+                  <th>Comment</th>
+                </tr>
+              </thead>
+              <tbody id="reports-body"></tbody>
+            </table>
+          </div>
+        </div>
           </div>
         </div>
 
@@ -322,6 +406,7 @@
         </div>
       </form>
     </div>
+  </div>
   </div>
 
   <script src="/static/app.js"></script>

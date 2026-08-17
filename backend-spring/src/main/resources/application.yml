@@ -1,0 +1,64 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: ragguard-orchestrator
+
+  datasource:
+    url: jdbc:h2:file:./data/ragguard;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=300s
+
+  webflux:
+    base-path: /api
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+# RAGGuard Orchestrator Configuration
+ragguard:
+  fastapi:
+    base-url: http://localhost:8000
+    timeout: 30s
+    connect-timeout: 5s
+  jwt:
+    secret: ${JWT_SECRET_KEY:changeme-generate-a-real-secret}
+    expiration: 3600000 # 1 hour in ms
+    algorithm: HS256
+  ollama:
+    host: http://localhost:11434
+    model: qwen2:1.5b
+  policy:
+    yaml-path: ../app/policy/policies.yaml
+
+logging:
+  level:
+    com.ragguard.orchestrator: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web.reactive: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"

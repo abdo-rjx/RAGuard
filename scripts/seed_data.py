@@ -21,16 +21,18 @@ from app.models.user import Department, Role, User  # noqa: E402
 DEPARTMENTS = ["finance", "it", "hr", "security", "executive", "general"]
 ROLES = ["ceo", "cfo", "cto", "hr_manager", "security_engineer", "it_engineer", "accountant", "employee"]
 
-# username → (role, home_department, is_admin)
+# username → (role, home_department, is_system_admin, is_security_admin)
+# Feature A1 separation of duties: ceo01 configures the system, seceng01 reads
+# audit content. No single demo account holds both powers.
 USERS = {
-    "ceo01": ("ceo", "executive", True),
-    "cfo01": ("cfo", "finance", False),
-    "cto01": ("cto", "it", False),
-    "hr01": ("hr_manager", "hr", False),
-    "seceng01": ("security_engineer", "security", True),
-    "iteng01": ("it_engineer", "it", False),
-    "accountant01": ("accountant", "finance", False),
-    "employee01": ("employee", "general", False),
+    "ceo01": ("ceo", "executive", True, False),
+    "cfo01": ("cfo", "finance", False, False),
+    "cto01": ("cto", "it", False, False),
+    "hr01": ("hr_manager", "hr", False, False),
+    "seceng01": ("security_engineer", "security", False, True),
+    "iteng01": ("it_engineer", "it", False, False),
+    "accountant01": ("accountant", "finance", False, False),
+    "employee01": ("employee", "general", False, False),
 }
 
 DEMO_PASSWORD = "Password123!"
@@ -136,7 +138,7 @@ def seed(db) -> None:
     roles = {r.name: r for r in db.query(Role).all()}
     departments = {d.name: d for d in db.query(Department).all()}
 
-    for username, (role_name, dept_name, is_admin) in USERS.items():
+    for username, (role_name, dept_name, is_system_admin, is_security_admin) in USERS.items():
         if db.query(User).filter(User.username == username).first():
             continue
         db.add(
@@ -145,7 +147,8 @@ def seed(db) -> None:
                 hashed_password=hash_password(DEMO_PASSWORD),
                 role_id=roles[role_name].id,
                 department_id=departments[dept_name].id,
-                is_admin=is_admin,
+                is_system_admin=is_system_admin,
+                is_security_admin=is_security_admin,
                 is_active=True,
             )
         )

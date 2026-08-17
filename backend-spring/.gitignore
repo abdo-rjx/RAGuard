@@ -1,0 +1,44 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Application
+data/
+*.db
+*.sqlite
+
+# Environment
+.env
+.env.local
+
+# Test reports
+target/surefire-reports/
+target/failsafe-reports/
+
+# Coverage
+target/site/jacoco/
+
+# Build
+*.war
+*.jar
+*.ear
+
+# Spring Boot
+spring-boot-devtools.properties

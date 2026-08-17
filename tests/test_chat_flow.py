@@ -42,6 +42,23 @@ def test_chat_finance_happy_path(monkeypatch, client, login, policy_engine, db_s
     assert body["sources"][0]["document_id"] == 101
 
 
+def test_chat_sources_carry_classification_badge(monkeypatch, client, login, policy_engine):
+    """Feature B2 — sources expose classification so the UI can show a badge
+    without leaking document content."""
+    _patch_retrieval(monkeypatch, policy_engine, [
+        make_chunk(1, "finance", "CONFIDENTIAL", 101),
+        make_chunk(2, "hr", "INTERNAL", 202),
+    ])
+    _patch_llm(monkeypatch)
+
+    token = login("cfo01")
+    r = client.post("/chat", headers=_auth(token), json={"message": "summary?"})
+    assert r.status_code == 200
+    by_doc = {s["document_id"]: s for s in r.json()["sources"]}
+    assert by_doc[101]["classification"] == "CONFIDENTIAL"
+    assert by_doc[202]["classification"] == "INTERNAL"
+
+
 def test_chat_never_leaks_unauthorized_department(monkeypatch, client, login, policy_engine):
     """accountant + leaky store: the IT chunk must never appear in sources."""
     _patch_retrieval(monkeypatch, policy_engine, [

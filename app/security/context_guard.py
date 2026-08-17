@@ -2,14 +2,12 @@
 
 A hit logs INJECTION_SUSPECTED_CONTEXT and the chunk is dropped — retrieved content is
 untrusted, and anything that looks like an instruction should not reach the prompt.
+
+Patterns are DB-backed (feature A4): read from guard_patterns via pattern_store.
 """
-import re
-
-from app.security.patterns import INJECTION_PATTERNS
-
-_compiled = [re.compile(p, re.IGNORECASE) for p in INJECTION_PATTERNS]
+from app.security.pattern_store import get_compiled
 
 
 def scan_context(chunk_text: str) -> list[str]:
     """Return the list of patterns that matched in this chunk (empty = clean)."""
-    return [p.pattern for p in _compiled if p.search(chunk_text)]
+    return [p.pattern for p in get_compiled("injection") if p.search(chunk_text)]

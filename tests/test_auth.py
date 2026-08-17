@@ -15,7 +15,8 @@ def test_login_success(client, login):
     assert body["username"] == "accountant01"
     assert body["role"] == "accountant"
     assert body["department"] == "finance"
-    assert body["is_admin"] is False
+    assert body["is_system_admin"] is False
+    assert body["is_security_admin"] is False
 
 
 def test_login_response_contract(client, login):
@@ -56,9 +57,16 @@ def test_me_rejects_expired_token(client):
     assert r.status_code == 401
 
 
-def test_admin_sees_admin_flag(client, login):
-    body = client.get("/auth/me", headers={"Authorization": f"Bearer {login('ceo01')}"}).json()
-    assert body["is_admin"] is True
+def test_admin_flags_split(client, login):
+    """Feature A1 — ceo01 is a System Admin (configures), seceng01 is a Security
+    Admin (reads audit content). No single demo account holds both powers."""
+    ceo = client.get("/auth/me", headers={"Authorization": f"Bearer {login('ceo01')}"}).json()
+    assert ceo["is_system_admin"] is True
+    assert ceo["is_security_admin"] is False
+
+    sec = client.get("/auth/me", headers={"Authorization": f"Bearer {login('seceng01')}"}).json()
+    assert sec["is_system_admin"] is False
+    assert sec["is_security_admin"] is True
 
 
 # ---- DB is the source of truth on every request (not the token) ------------

@@ -6,10 +6,21 @@ import tempfile
 
 # MUST be set before app.config is imported so pydantic-settings picks these up
 # over the real .env.
-_TEST_DIR = tempfile.mkdtemp(prefix="ragguard_test_")
-os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DIR}/test.db"
-os.environ["CHROMA_PERSIST_DIR"] = os.path.join(_TEST_DIR, "chroma")
-os.environ["ENVIRONMENT"] = "test"  # Disable rate limiter during tests
+#
+# Guard against double import: pytest loads this file both as its `conftest`
+# plugin AND as `tests.conftest` whenever a test does `from tests.conftest
+# import ...`. Without the guard, the second import re-runs the setup below and
+# clobbers DATABASE_URL with a fresh temp dir, silently splitting the app engine
+# (settings, first dir) from the fixture engines (second dir).
+if os.environ.get("RAGGUARD_TEST_DIR"):
+    _TEST_DIR = os.environ["RAGGUARD_TEST_DIR"]
+else:
+    _TEST_DIR = tempfile.mkdtemp(prefix="ragguard_test_")
+    os.environ["RAGGUARD_TEST_DIR"] = _TEST_DIR
+    os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DIR}/test.db"
+    os.environ["CHROMA_PERSIST_DIR"] = os.path.join(_TEST_DIR, "chroma")
+    os.environ["ENVIRONMENT"] = "test"  # Disable rate limiter during tests
+    os.environ["JWT_SECRET_KEY"] = "test-secret-key-hermetic-not-production"  # hermetic tests
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -26,16 +37,16 @@ from app.retrieval.vector_store import RetrievedChunk  # noqa: E402
 DEPARTMENTS = ["finance", "it", "hr", "security", "executive", "general"]
 ROLES = ["ceo", "cfo", "cto", "hr_manager", "security_engineer", "it_engineer", "accountant", "employee"]
 
-# username → (role, home department, is_admin)
+# username → (role, home department, is_system_admin, is_security_admin)
 USERS = {
-    "ceo01": ("ceo", "executive", True),
-    "cfo01": ("cfo", "finance", False),
-    "cto01": ("cto", "it", False),
-    "hr01": ("hr_manager", "hr", False),
-    "seceng01": ("security_engineer", "security", True),
-    "iteng01": ("it_engineer", "it", False),
-    "accountant01": ("accountant", "finance", False),
-    "employee01": ("employee", "general", False),
+    "ceo01": ("ceo", "executive", True, False),
+    "cfo01": ("cfo", "finance", False, False),
+    "cto01": ("cto", "it", False, False),
+    "hr01": ("hr_manager", "hr", False, False),
+    "seceng01": ("security_engineer", "security", False, True),
+    "iteng01": ("it_engineer", "it", False, False),
+    "accountant01": ("accountant", "finance", False, False),
+    "employee01": ("employee", "general", False, False),
 }
 
 DEMO_PASSWORD = "Password123!"
@@ -49,14 +60,15 @@ def _seed(session) -> None:
     session.commit()
     roles = {r.name: r for r in session.query(Role).all()}
     depts = {d.name: d for d in session.query(Department).all()}
-    for username, (role_name, dept_name, is_admin) in USERS.items():
+    for username, (role_name, dept_name, is_system_admin, is_security_admin) in USERS.items():
         session.add(
             User(
                 username=username,
                 hashed_password=hash_password(DEMO_PASSWORD),
                 role_id=roles[role_name].id,
                 department_id=depts[dept_name].id,
-                is_admin=is_admin,
+                is_system_admin=is_system_admin,
+                is_security_admin=is_security_admin,
                 is_active=True,
             )
         )

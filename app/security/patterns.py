@@ -1,4 +1,14 @@
-"""Shared regex pattern lists (plan Section 10). Starting points, expected to grow."""
+"""Default regex pattern lists (feature A4).
+
+These are now SEED DEFAULTS only: on startup they are inserted into the
+`guard_patterns` table (if empty), and they serve as the in-memory fallback
+when the DB is unreachable or has no active patterns. At runtime the guards
+read from the DB via `app/security/pattern_store.py`, not from this module —
+so an admin can add/toggle/remove patterns through the API and the change
+takes effect on the next cache refresh.
+
+Starting points, expected to grow.
+"""
 
 # Scans user queries AND retrieved chunks for prompt-injection-style text.
 # A match never blocks access — the security guarantee is the retriever, not the words.
