@@ -47,11 +47,12 @@ def test_list_hides_docs_above_ceiling(client, login, db_session_factory):
 
 
 def test_ceo_sees_everything(client, login, db_session_factory):
-    """ceo has TOP_SECRET everywhere → sees all documents."""
+    """ceo has TOP_SECRET everywhere (incl. general) → sees all documents."""
     db = db_session_factory()
     try:
         _add_doc(db, "merger_secret.txt", "executive", "TOP_SECRET")
         _add_doc(db, "incident.txt", "security", "RESTRICTED")
+        _add_doc(db, "overview.txt", "general", "PUBLIC")
     finally:
         db.close()
 
@@ -60,6 +61,28 @@ def test_ceo_sees_everything(client, login, db_session_factory):
     names = _names(r.json())
     assert "merger_secret.txt" in names
     assert "incident.txt" in names
+    assert "overview.txt" in names
+
+
+def test_all_roles_see_public_general_docs(client, login, db_session_factory):
+    """general is the PUBLIC department — every role reads general/PUBLIC docs;
+    only ceo (TOP_SECRET ceiling) may go above PUBLIC there."""
+    db = db_session_factory()
+    try:
+        _add_doc(db, "overview.txt", "general", "PUBLIC")
+        _add_doc(db, "internal_notes.txt", "general", "INTERNAL")
+    finally:
+        db.close()
+
+    everyone = ["ceo01", "cfo01", "cto01", "hr01", "seceng01", "iteng01", "accountant01", "employee01"]
+    for username in everyone:
+        r = client.get("/documents", headers=_auth(login(username)))
+        assert r.status_code == 200
+        assert "overview.txt" in _names(r.json()), f"{username} should see general/PUBLIC docs"
+
+    for username in [u for u in everyone if u != "ceo01"]:
+        names = _names(client.get("/documents", headers=_auth(login(username))).json())
+        assert "internal_notes.txt" not in names, f"{username} must not see general/INTERNAL"
 
 
 def test_employee_sees_only_public_general(client, login, db_session_factory):

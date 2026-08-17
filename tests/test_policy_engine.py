@@ -1,7 +1,8 @@
 """Policy engine tests — every role × department from plan Section 7's table."""
 import pytest
 
-# (role, department, max_classification) — the plan Section 7 table verbatim.
+# (role, department, max_classification) — plan Section 7's table, plus
+# `general: PUBLIC` for every role (general is the PUBLIC department, readable by all).
 # Absent = no access at all.
 ROLE_DEPT_CEILINGS = [
     ("ceo", "finance", "TOP_SECRET"),
@@ -9,16 +10,23 @@ ROLE_DEPT_CEILINGS = [
     ("ceo", "hr", "TOP_SECRET"),
     ("ceo", "security", "TOP_SECRET"),
     ("ceo", "executive", "TOP_SECRET"),
+    ("ceo", "general", "TOP_SECRET"),
     ("cfo", "finance", "CONFIDENTIAL"),
     ("cfo", "hr", "INTERNAL"),
     ("cfo", "executive", "INTERNAL"),
+    ("cfo", "general", "PUBLIC"),
     ("cto", "it", "CONFIDENTIAL"),
     ("cto", "security", "INTERNAL"),
     ("cto", "executive", "INTERNAL"),
+    ("cto", "general", "PUBLIC"),
     ("hr_manager", "hr", "CONFIDENTIAL"),
+    ("hr_manager", "general", "PUBLIC"),
     ("security_engineer", "security", "RESTRICTED"),
+    ("security_engineer", "general", "PUBLIC"),
     ("it_engineer", "it", "INTERNAL"),
+    ("it_engineer", "general", "PUBLIC"),
     ("accountant", "finance", "CONFIDENTIAL"),
+    ("accountant", "general", "PUBLIC"),
     ("employee", "general", "PUBLIC"),
 ]
 
@@ -106,19 +114,19 @@ def test_allowed_classifications_order(engine):
 
 
 def test_build_chroma_filter(engine):
-    # accountant → single department clause with classification IN [...]
+    # accountant → OR of finance + general (public dept) clauses
     f = engine.build_chroma_filter("accountant")
-    assert f == {
-        "$and": [
-            {"department": {"$eq": "finance"}},
-            {"classification": {"$in": ["PUBLIC", "INTERNAL", "CONFIDENTIAL"]}},
-        ]
-    }
+    assert "$or" in f
+    assert len(f["$or"]) == 2
+    finance_clause = next(c for c in f["$or"] if c["$and"][0]["department"]["$eq"] == "finance")
+    assert finance_clause["$and"][1]["classification"]["$in"] == ["PUBLIC", "INTERNAL", "CONFIDENTIAL"]
+    general_clause = next(c for c in f["$or"] if c["$and"][0]["department"]["$eq"] == "general")
+    assert general_clause["$and"][1]["classification"]["$in"] == ["PUBLIC"]
 
-    # cfo → OR of three department clauses
+    # cfo → OR of four department clauses (finance, hr, executive, general)
     f = engine.build_chroma_filter("cfo")
     assert "$or" in f
-    assert len(f["$or"]) == 3
+    assert len(f["$or"]) == 4
     finance_clause = next(c for c in f["$or"] if c["$and"][0]["department"]["$eq"] == "finance")
     assert finance_clause["$and"][1]["classification"]["$in"] == ["PUBLIC", "INTERNAL", "CONFIDENTIAL"]
 

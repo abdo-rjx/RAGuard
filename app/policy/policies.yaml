@@ -2,6 +2,9 @@
 #
 # classification_levels is an ordered list — a role can read everything AT OR BELOW
 # its per-department ceiling. A department absent from a role's entry means zero access.
+#
+# `general` is the PUBLIC department (company overview, etc.) — every role can read
+# it at PUBLIC; only roles with a higher ceiling there (ceo) go above PUBLIC.
 
 classification_levels: [PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED, TOP_SECRET]
 
@@ -12,21 +15,28 @@ roles:
     hr: TOP_SECRET
     security: TOP_SECRET
     executive: TOP_SECRET
+    general: TOP_SECRET
   cfo:
     finance: CONFIDENTIAL
     hr: INTERNAL
     executive: INTERNAL
+    general: PUBLIC
   cto:
     it: CONFIDENTIAL
     security: INTERNAL
     executive: INTERNAL
+    general: PUBLIC
   hr_manager:
     hr: CONFIDENTIAL
+    general: PUBLIC
   security_engineer:
     security: RESTRICTED
+    general: PUBLIC
   it_engineer:
     it: INTERNAL
+    general: PUBLIC
   accountant:
     finance: CONFIDENTIAL
+    general: PUBLIC
   employee:
     general: PUBLIC

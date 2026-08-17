@@ -176,22 +176,29 @@ roles:
     hr: TOP_SECRET
     security: TOP_SECRET
     executive: TOP_SECRET
+    general: TOP_SECRET
   cfo:
     finance: CONFIDENTIAL
     hr: INTERNAL
     executive: INTERNAL
+    general: PUBLIC
   cto:
     it: CONFIDENTIAL
     security: INTERNAL
     executive: INTERNAL
+    general: PUBLIC
   hr_manager:
     hr: CONFIDENTIAL
+    general: PUBLIC
   security_engineer:
     security: RESTRICTED
+    general: PUBLIC
   it_engineer:
     it: INTERNAL
+    general: PUBLIC
   accountant:
     finance: CONFIDENTIAL
+    general: PUBLIC
   employee:
     general: PUBLIC
 ```
@@ -200,14 +207,19 @@ Human-readable version of the same table:
 
 | Role | Access (max classification per department) |
 |---|---|
-| ceo | finance, it, hr, security, executive — all at TOP_SECRET |
-| cfo | finance (CONFIDENTIAL), hr (INTERNAL), executive (INTERNAL) |
-| cto | it (CONFIDENTIAL), security (INTERNAL), executive (INTERNAL) |
-| hr_manager | hr (CONFIDENTIAL) |
-| security_engineer | security (RESTRICTED) |
-| it_engineer | it (INTERNAL) |
-| accountant | finance (CONFIDENTIAL) |
+| ceo | finance, it, hr, security, executive, general — all at TOP_SECRET |
+| cfo | finance (CONFIDENTIAL), hr (INTERNAL), executive (INTERNAL), general (PUBLIC) |
+| cto | it (CONFIDENTIAL), security (INTERNAL), executive (INTERNAL), general (PUBLIC) |
+| hr_manager | hr (CONFIDENTIAL), general (PUBLIC) |
+| security_engineer | security (RESTRICTED), general (PUBLIC) |
+| it_engineer | it (INTERNAL), general (PUBLIC) |
+| accountant | finance (CONFIDENTIAL), general (PUBLIC) |
 | employee | general (PUBLIC) |
+
+> `general` is the PUBLIC department — every role reads it at PUBLIC; only `ceo`
+> goes above PUBLIC there. (Added post-plan: the MVP table originally omitted
+> `general` for every role except `employee`/`ceo`, which made public company docs
+> invisible to most roles.)
 
 `PolicyEngine` behavior (`app/policy/policy_engine.py`):
 

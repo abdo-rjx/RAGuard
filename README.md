@@ -40,13 +40,17 @@ Every user's password is `Password123!`.
 | Username      | Role               | Home dept | Can see (per YAML policy) |
 |---------------|--------------------|-----------|---------------------------|
 | `ceo01`       | ceo (system admin) | executive | everything (TOP_SECRET)   |
-| `cfo01`       | cfo                | finance   | finance, hr, executive    |
-| `cto01`       | cto                | it        | it, security, executive   |
-| `hr01`        | hr_manager         | hr        | hr                        |
-| `seceng01`    | security_engineer (security admin) | security | security      |
-| `iteng01`     | it_engineer        | it        | it                        |
-| `accountant01`| accountant         | finance   | finance                   |
+| `cfo01`       | cfo                | finance   | finance, hr, executive, general (PUBLIC) |
+| `cto01`       | cto                | it        | it, security, executive, general (PUBLIC) |
+| `hr01`        | hr_manager         | hr        | hr, general (PUBLIC)      |
+| `seceng01`    | security_engineer (security admin) | security | security, general (PUBLIC) |
+| `iteng01`     | it_engineer        | it        | it, general (PUBLIC)      |
+| `accountant01`| accountant         | finance   | finance, general (PUBLIC) |
 | `employee01`  | employee           | general   | general (PUBLIC)          |
+
+The `general` department holds PUBLIC company info (e.g. the company overview) —
+every role can read it at PUBLIC. A role's ceiling still applies there: only `ceo`
+(TOP_SECRET) can see `general` documents above PUBLIC.
 
 Admin powers are split (feature A1 — separation of duties): `ceo01` is a **System
 Admin** (documents, guard patterns, policy preview) and `seceng01` is a **Security

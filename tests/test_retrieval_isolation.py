@@ -110,7 +110,9 @@ def test_role_specific_isolations(monkeypatch, policy_engine, db_session_factory
             ("security_engineer", "hr", False),
             ("cfo", "finance", True),
             ("cfo", "security", False),
+            ("cfo", "general", True),    # public dept is visible to every role
             ("ceo", "executive", True),
+            ("ceo", "general", True),   # ceo sees everything, incl. public general docs
         ]
         for role, dept, expect_present in cases:
             result = _retrieve_for_role(monkeypatch, policy_engine, db, leaky_store, role)
@@ -129,8 +131,9 @@ def test_recheck_failure_is_audited(monkeypatch, policy_engine, db_session_facto
     try:
         _retrieve_for_role(monkeypatch, policy_engine, db, leaky_store, "accountant")
         denied = db.query(AuditLog).filter(AuditLog.action == "ACCESS_DENIED").count()
-        # accountant's ceiling is finance/CONFIDENTIAL → denied on finance/RESTRICTED,
-        # finance/TOP_SECRET (2) + all 5 levels × 5 other departments (25) = 27 denied
-        assert denied == 27
+        # accountant's ceiling is finance/CONFIDENTIAL + general/PUBLIC → denied on
+        # finance/RESTRICTED, finance/TOP_SECRET (2) + general/INTERNAL..TOP_SECRET (4)
+        # + all 5 levels × 4 other departments (it, hr, security, executive = 20) = 26
+        assert denied == 26
     finally:
         db.close()
