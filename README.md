@@ -10,6 +10,32 @@ Built from `plan(2).md` (the concrete build plan) — RBAC+ABAC policy engine, s
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart LR
+    UI["Web UI / API client"] -->|"JWT bearer"| API["FastAPI<br/>/chat"]
+    API --> AUTH["Auth<br/>JWT-derived identity"]
+    AUTH --> RET["SecureRetriever"]
+    POL["PolicyEngine<br/>policies.yaml"] --> FILT["Chroma filter<br/>department x classification"]
+    RET --> FILT --> DB[(Chroma vector DB)]
+    DB -->|"candidate chunks"| RECHECK["Defense-in-depth re-check<br/>deterministic Python"]
+    RECHECK -->|"denied"| AUD[("Audit log")]
+    RECHECK -->|"allowed"| CGRD["Context guard"]
+    CGRD --> LLM["Ollama LLM"]
+    LLM --> OGRD["Output guard"]
+    OGRD --> API
+```
+
+The request path is simple by design: **authorization happens before the LLM, never inside it.**
+
+1. The JWT is the only source of identity — there is no role/department field in the chat request body.
+2. `PolicyEngine` turns the role into a Chroma `where` filter, so the vector DB itself only returns documents the role may see.
+3. Every returned chunk is re-validated in plain Python (defense-in-depth), and denied chunks are audited.
+4. Only surviving chunks reach the LLM context — then the output guard scans the answer before it returns to the client.
+
+---
+
 ## Quickstart (Fedora)
 
 ```bash
@@ -56,6 +82,14 @@ Admin powers are split (feature A1 — separation of duties): `ceo01` is a **Sys
 Admin** (documents, guard patterns, policy preview) and `seceng01` is a **Security
 Admin** (audit logs, security events, alerts, reports). Neither can do the other's job.
 
+```mermaid
+flowchart TD
+    CEO["ceo01 — System Admin"] --> SYS["Documents<br/>Guard patterns<br/>Policy preview"]
+    CEO -.->|"no access"| SECV["Audit logs<br/>Security events<br/>Alerts & reports"]
+    SEC["seceng01 — Security Admin"] --> SECV
+    SEC -.->|"no access"| SYS
+```
+
 Sample documents (`scripts/seed_data.py` → `data/sample_docs/`): revenue report (finance/CONFIDENTIAL), network architecture (it/INTERNAL), company overview (general/PUBLIC), employee salaries (hr/CONFIDENTIAL), security incident (security/RESTRICTED), acquisition strategy (executive/TOP_SECRET).
 
 ## API
@@ -81,6 +115,36 @@ Sample documents (`scripts/seed_data.py` → `data/sample_docs/`): revenue repor
 | `GET /security/reports` | security admin | user-submitted security concerns (A6/B3) |
 
 ## How the security guarantee holds
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant API as FastAPI
+    participant RET as SecureRetriever
+    participant POL as PolicyEngine
+    participant DB as Chroma
+    participant LLM as Ollama
+    U->>API: POST /chat (JWT)
+    API->>RET: retrieve(role, message)
+    RET->>POL: build_chroma_filter(role)
+    POL-->>RET: department + classification clauses
+    RET->>DB: query(where=filter)
+    DB-->>RET: candidate chunks
+    loop re-check every chunk
+        RET->>POL: can_access_document(chunk)
+        alt chunk denied
+            RET-->>API: drop + audit ACCESS_DENIED
+        end
+    end
+    alt no chunks survived
+        API-->>U: fixed "I don't have information about that."
+    else context available
+        RET->>LLM: authorized chunks only
+        LLM-->>RET: answer
+        RET-->>API: answer + sources
+        API-->>U: answer + sources
+    end
+```
 
 1. **Identity comes only from the JWT.** The chat request schema has no role/department field. Nothing in the request body or message text can override the verified identity.
 2. **Policy-built Chroma filter.** `PolicyEngine.build_chroma_filter(role)` emits a `$or` of `$and(department, classification IN [...])` clauses so the vector DB itself only returns what the role may see.
@@ -124,7 +188,7 @@ Design-level tradeoffs (documented, not "bugs"): the bearer token lives in `loca
 pytest
 ```
 
-90 tests including the full role × department × classification isolation matrix — a `FakeVectorStore` returns *everything* (simulating a broken filter) and asserts the re-check still lets nothing unauthorized through — plus coverage for the features above: admin role gating, permission preview, ingestion status, DB-backed patterns, anomaly alerts, conversations, feedback/reports, and self-service.
+103 tests including the full role × department × classification isolation matrix — a `FakeVectorStore` returns *everything* (simulating a broken filter) and asserts the re-check still lets nothing unauthorized through — plus coverage for the features above: admin role gating, permission preview, ingestion status, DB-backed patterns, anomaly alerts, conversations, feedback/reports, self-service, the no-context guard, and a **policy audit** that fails loudly if a department ever goes missing from `policies.yaml`.
 
 ## Project layout
 
@@ -151,4 +215,3 @@ tests/               # pytest suite (isolation matrix, auth, chat, injection)
 ## Roadmap (beyond MVP)
 
 Per `plan(2).md` Section 13: per-document ACL overrides and richer ABAC attributes (Phase 2), ML-based injection/leak detection + behavioral alerting (Phase 3), PostgreSQL / multi-tenant / SSO / cloud (Phase 4).
-# RAGuard
