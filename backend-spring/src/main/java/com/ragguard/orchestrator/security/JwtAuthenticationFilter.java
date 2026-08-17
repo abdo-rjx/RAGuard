@@ -52,7 +52,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String role = claims.get("role", String.class);
                 String department = claims.get("department", String.class);
 
-                if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                // A token without a role claim is useless for RBAC — refuse it
+                // instead of NPE-ing on role.toUpperCase() below (missing claims
+                // surface as null, which is NOT a JwtException).
+                if (role == null) {
+                    log.debug("JWT missing role claim; not authenticating");
+                } else if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     List<SimpleGrantedAuthority> authorities = Collections.singletonList(
                             new SimpleGrantedAuthority("ROLE_" + role.toUpperCase())
                     );

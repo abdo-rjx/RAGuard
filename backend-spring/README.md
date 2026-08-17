@@ -49,9 +49,11 @@ chmod +x run.sh
 ### Default Users
 | Username | Password | Role |
 |----------|----------|------|
-| admin | admin123 | ADMIN |
-| analyst | analyst123 | ANALYST |
-| user | user123 | USER |
+| admin | admin123 (or `ADMIN_PASSWORD`) | ADMIN |
+| analyst | analyst123 (or `ANALYST_PASSWORD`) | ANALYST |
+| user | user123 (or `USER_PASSWORD`) | USER |
+
+Passwords are overridable via environment variables (`ADMIN_PASSWORD`, `ANALYST_PASSWORD`, `USER_PASSWORD`).
 
 ## API Endpoints
 
@@ -159,3 +161,6 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 - CORS configured for localhost:3000, localhost:8080, 127.0.0.1:8000
 - All endpoints except `/auth/**` and `/health/**` require authentication
 - Role-based method security with `@PreAuthorize`
+- **Self-registration cannot grant elevated roles** — `/api/auth/register` only allows `USER`/`ANALYST`; `ADMIN` is reserved for `DataInitializer` (CWE-269/CWE-285)
+- Actuator is not exposed anonymously: only `/actuator/health` is public, everything else requires auth
+- `JWT_SECRET_KEY` should always be set in the environment — without it, a random key is used and all tokens are invalidated on restart

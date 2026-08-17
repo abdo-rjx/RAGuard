@@ -130,6 +130,16 @@ def test_build_chroma_filter(engine):
     finance_clause = next(c for c in f["$or"] if c["$and"][0]["department"]["$eq"] == "finance")
     assert finance_clause["$and"][1]["classification"]["$in"] == ["PUBLIC", "INTERNAL", "CONFIDENTIAL"]
 
+    # employee → single general/PUBLIC clause (only single-department role;
+    # exercises the "clauses[0] if len == 1" branch of build_chroma_filter)
+    f = engine.build_chroma_filter("employee")
+    assert f == {
+        "$and": [
+            {"department": {"$eq": "general"}},
+            {"classification": {"$in": ["PUBLIC"]}},
+        ]
+    }
+
     # unknown role → matches nothing
     f = engine.build_chroma_filter("ghost")
     assert f == {"department": {"$eq": "__none__"}}

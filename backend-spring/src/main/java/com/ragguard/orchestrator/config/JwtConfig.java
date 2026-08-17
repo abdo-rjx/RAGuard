@@ -11,13 +11,19 @@ import java.nio.charset.StandardCharsets;
 @Configuration
 public class JwtConfig {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JwtConfig.class);
+
     @Value("${ragguard.jwt.secret}")
     private String jwtSecret;
 
     @Bean
     public SecretKey jwtSecretKey() {
         if (jwtSecret == null || jwtSecret.equals("changeme-generate-a-real-secret")) {
-            // Generate a secure key for development
+            // Dev-only fallback: a random key means tokens are invalidated on every
+            // restart. Make the operator aware instead of failing silently.
+            log.warn("JWT_SECRET_KEY is missing or the insecure default. Using a random key — "
+                    + "all tokens will be invalidated on the next restart. Set JWT_SECRET_KEY "
+                    + "in the environment for stable, secure tokens.");
             return Keys.secretKeyFor(io.jsonwebtoken.SignatureAlgorithm.HS256);
         }
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));

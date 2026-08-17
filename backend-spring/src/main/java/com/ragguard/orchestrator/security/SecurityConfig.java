@@ -39,7 +39,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/health/**").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
+                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/actuator/**").authenticated()
+                        .requestMatchers("/error").permitAll()  // error dispatch must not be blocked by security
                         .requestMatchers(HttpMethod.GET, "/documents/**").hasAnyRole("USER", "ADMIN", "ANALYST")
                         .requestMatchers(HttpMethod.POST, "/documents/**").hasAnyRole("ADMIN", "ANALYST")
                         .requestMatchers("/chat/**").hasAnyRole("USER", "ADMIN", "ANALYST")

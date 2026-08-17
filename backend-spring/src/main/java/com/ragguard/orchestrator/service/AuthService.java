@@ -19,11 +19,16 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class AuthService implements UserDetailsService {
+
+    /** Roles a user may self-assign via public registration (CWE-269/CWE-285).
+     *  ADMIN is reserved for DataInitializer — never from a client request. */
+    private static final Set<String> ALLOWED_SELF_REGISTER_ROLES = Set.of("USER", "ANALYST");
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -72,10 +77,17 @@ public class AuthService implements UserDetailsService {
             throw new IllegalArgumentException("Username already exists");
         }
 
+        // Never trust a role sent by the client on public self-registration:
+        // normalize it and restrict to the allowlist, so nobody can register as ADMIN.
+        String requestedRole = request.getRole() == null ? "USER" : request.getRole().toUpperCase();
+        if (!ALLOWED_SELF_REGISTER_ROLES.contains(requestedRole)) {
+            throw new IllegalArgumentException("Role not allowed for self-registration");
+        }
+
         User user = User.builder()
                 .username(request.getUsername())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(request.getRole().toUpperCase())
+                .role(requestedRole)
                 .department(request.getDepartment())
                 .active(true)
                 .build();

@@ -173,6 +173,7 @@ def chat(
         details_json={
             "conversation_id": conv.id,
             "chunk_count": len(result.chunks),
+            "no_context": not result.chunks,  # LLM never called → answer is the fixed NO_CONTEXT_ANSWER
             "dropped_by_recheck": len(result.dropped_by_recheck),
             "dropped_by_context_guard": len(result.dropped_by_context_guard),
             "query_pattern_matches": result.matched_query_patterns,

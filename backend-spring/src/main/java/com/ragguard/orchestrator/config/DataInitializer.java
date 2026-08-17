@@ -6,6 +6,7 @@ import com.ragguard.orchestrator.repository.PermissionRepository;
 import com.ragguard.orchestrator.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,16 @@ public class DataInitializer implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PermissionRepository permissionRepository;
     private final PasswordEncoder passwordEncoder;
+
+    /** Default-user passwords, overridable via env (ADMIN_PASSWORD, ANALYST_PASSWORD, USER_PASSWORD). */
+    @Value("${ragguard.default-users.admin-password:admin123}")
+    private String adminPassword;
+
+    @Value("${ragguard.default-users.analyst-password:analyst123}")
+    private String analystPassword;
+
+    @Value("${ragguard.default-users.user-password:user123}")
+    private String userPassword;
 
     @Override
     @Transactional
@@ -65,7 +76,7 @@ public class DataInitializer implements CommandLineRunner {
 
             User admin = User.builder()
                     .username("admin")
-                    .passwordHash(passwordEncoder.encode("admin123"))
+                    .passwordHash(passwordEncoder.encode(adminPassword))
                     .role("ADMIN")
                     .department("IT")
                     .active(true)
@@ -83,7 +94,7 @@ public class DataInitializer implements CommandLineRunner {
 
             User analyst = User.builder()
                     .username("analyst")
-                    .passwordHash(passwordEncoder.encode("analyst123"))
+                    .passwordHash(passwordEncoder.encode(analystPassword))
                     .role("ANALYST")
                     .department("Security")
                     .active(true)
@@ -101,7 +112,7 @@ public class DataInitializer implements CommandLineRunner {
 
             User user = User.builder()
                     .username("user")
-                    .passwordHash(passwordEncoder.encode("user123"))
+                    .passwordHash(passwordEncoder.encode(userPassword))
                     .role("USER")
                     .department("Engineering")
                     .active(true)
