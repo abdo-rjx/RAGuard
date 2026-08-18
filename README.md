@@ -97,6 +97,7 @@ Sample documents (`scripts/seed_data.py` → `data/sample_docs/`): revenue repor
 | Endpoint | Auth | Purpose |
 |---|---|---|
 | `POST /auth/login` | none | `{username, password}` → JWT |
+| `POST /auth/logout` | required | clear JWT cookie |
 | `GET /auth/me` | required | identity from token |
 | `POST /chat` | required | RAG chat — `{message}` → `{answer, sources, conversation_id}` |
 | `POST /chat/feedback` | required | thumbs up/down, or `security_concern` (B3) |
@@ -113,6 +114,11 @@ Sample documents (`scripts/seed_data.py` → `data/sample_docs/`): revenue repor
 | `GET /security/events` | security admin | DENY + injection/output events |
 | `GET /security/alerts` | security admin | anomaly-flagged users (A5) |
 | `GET /security/reports` | security admin | user-submitted security concerns (A6/B3) |
+| `GET /health` | none | health check |
+| `GET /api/health/ping` | none | liveness probe |
+| `GET /api/health/degradation` | none | degradation check |
+| `GET /api/provider-metrics` | none | LLM provider status |
+| `GET /api/token-health` | none | token usage stats |
 
 ## How the security guarantee holds
 
@@ -175,12 +181,12 @@ Findings from a full-codebase security review, all fixed:
 
 - **Upload memory DoS** — `POST /documents` buffered the whole file into memory with no size cap. Now rejects >10 MB with `413` (checked via Content-Length *and* a capped read) before any extraction.
 - **Chat/LLM DoS** — `/chat`, `/chat/feedback`, and `/auth/me/password` were unthrottled (each chat call hits Chroma + Ollama). Added slowapi limits (`30/min`, `20/min`, `10/min`); login already had `10/min`.
-- **Missing security headers** — added a middleware setting `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and a CSP (`default-src 'self'`, `script-src 'self'`, `frame-ancestors 'none'`) on every response.
+- **Missing security headers** — added a middleware setting `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and a CSP (`default-src 'self'`, `script-src 'self'`, `style-src 'self' 'unsafe-inline'`, `img-src 'self' data:`, `connect-src 'self'`, `base-uri 'self'`, `form-action 'self'`, `frame-ancestors 'none'`) on every response.
 - **Username-enumeration timing side channel** — login now runs a bcrypt verify against a dummy hash when the username doesn't exist, so latency no longer reveals whether an account is registered.
 - **Stale tokens after password change** — passwords changed but old JWTs kept working. Added `User.token_version`, embedded as the `ver` claim; every request checks it, and `POST /auth/me/password` bumps it, revoking all outstanding tokens immediately.
 - **Log injection** — free-text audit fields (`query_text`, `username`, `reason`) are stripped of control characters so a malicious query can't forge lines in the exported audit trail.
 
-Design-level tradeoffs (documented, not "bugs"): the bearer token lives in `localStorage` (XSS-storage tradeoff typical of SPAs — worth revisiting with httpOnly cookies if the threat model tightens), and the prompt-injection / leak guards are heuristic by design (the retriever is the real authorization gate).
+Design-level tradeoffs (documented, not "bugs"): the JWT is stored in an `httpOnly` cookie (`ragguard_token`), not `localStorage` — this prevents JavaScript access and mitigates XSS token theft. The prompt-injection / leak guards are heuristic by design (the retriever is the real authorization gate).
 
 ## Tests
 
@@ -206,11 +212,33 @@ app/
   security/          # query/context/output guards
   llm/               # Ollama streaming client
   audit/             # audit logger
-  routers/           # auth, chat, documents, audit
+  routers/           # auth, chat, documents, audit, conversations, policy, security
+  rate_limit.py      # slowapi rate-limit configuration
   static/            # minimal UI (login, chat, admin)
 scripts/             # seed_data.py, ingest_documents.py
 tests/               # pytest suite (isolation matrix, auth, chat, injection)
 ```
+
+## Backend-Spring (orchestrator)
+
+A separate Spring Boot 3.2 orchestrator lives in `backend-spring/`. It acts as a gateway in front of the FastAPI backend, adding:
+
+- **JWT Authentication** — compatible with the FastAPI JWT format
+- **Role-Based Access Control** — `ADMIN`, `ANALYST`, `USER` roles with `@PreAuthorize` method security
+- **Reactive WebClient** — non-blocking calls to the FastAPI backend with connection pooling
+- **Document Management** — upload, list, search, delete, reindex via FastAPI
+- **Chat & Conversations** — streaming (SSE) and non-streaming chat
+- **Health Checks** — Kubernetes-ready liveness/readiness probes
+- **Self-registration** — limited to `USER`/`ANALYST` roles; `ADMIN` is reserved for `DataInitializer` (CWE-269/CWE-285)
+
+```bash
+# Requires Java 21+ and Maven 3.9+ (or included wrapper)
+cd backend-spring
+chmod +x run.sh
+./run.sh   # starts on port 8080, proxies to FastAPI on port 8000
+```
+
+See [`backend-spring/README.md`](backend-spring/README.md) for full documentation, default users, and configuration.
 
 ## Roadmap (beyond MVP)
 
