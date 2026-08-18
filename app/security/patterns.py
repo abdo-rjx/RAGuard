@@ -27,5 +27,6 @@ LEAK_PATTERNS = [
     r"ghp_[A-Za-z0-9]{30,}",         # GitHub token style
     r"AKIA[0-9A-Z]{12,}",            # AWS access key style
     r"-----BEGIN [A-Z ]+PRIVATE KEY-----",
-    r"\b\d{13,16}\b",                # card-number-length digit runs
+    # \b\d{13,16}\b removed — redacts legitimate EANs, order numbers, etc.
+    # Add more specific patterns if credit-card detection is genuinely needed.
 ]

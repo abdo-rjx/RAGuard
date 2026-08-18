@@ -58,10 +58,16 @@ MAX_HISTORY_TURNS = 10
 def _format_context(chunks) -> str:
     if not chunks:
         return "[NO DOCUMENTS WERE RETRIEVED FOR THIS USER — you do not have the information to answer]"
-    parts = [
-        f"[doc {c.document_id} · {c.department}/{c.classification} · {c.source_filename}]\n{c.text}"
-        for c in chunks
-    ]
+    parts = []
+    for c in chunks:
+        # Sanitize source_filename to prevent prompt injection via filename
+        # The filename comes from user uploads and is interpolated into the prompt
+        safe_filename = c.source_filename.replace("]", "").replace("[", "").replace("{", "").replace("}", "")
+        # Limit length to prevent context stuffing
+        safe_filename = safe_filename[:100]
+        parts.append(
+            f"[doc {c.document_id} · {c.department}/{c.classification} · {safe_filename}]\n{c.text}"
+        )
     return "\n\n".join(parts)
 
 

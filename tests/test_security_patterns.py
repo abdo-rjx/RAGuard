@@ -14,7 +14,7 @@ from app.security.pattern_store import refresh_pattern_cache, seed_default_patte
 from app.security.query_guard import scan_query
 
 DEFAULT_INJECTION = 6
-DEFAULT_LEAK = 5
+DEFAULT_LEAK = 4
 
 
 @pytest.fixture(autouse=True)

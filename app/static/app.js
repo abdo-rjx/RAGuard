@@ -2,8 +2,8 @@
 "use strict";
 
 /* ---------- state ---------- */
-let token = localStorage.getItem("ragguard_token") || null;
-let user = null;          // { id, username, role, department, is_admin }
+// Token is now in an httpOnly cookie — we don't store it in localStorage
+let user = null;          // { id, username, role, department, is_system_admin, is_security_admin }
 let convCount = 0;
 
 const $ = (id) => document.getElementById(id);
@@ -52,9 +52,9 @@ async function api(path, options = {}) {
   if (options.body && !(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  // Token is sent automatically via httpOnly cookie — no need to add Authorization header
 
-  const res = await fetch(path, { ...options, headers });
+  const res = await fetch(path, { ...options, headers, credentials: "include" });
   if (res.status === 401) {
     logout(false);
     throw new Error("Your session has expired. Please sign in again.");
@@ -80,14 +80,18 @@ async function login(username, password) {
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
-  token = data.access_token;
-  localStorage.setItem("ragguard_token", token);
+  // Token is now stored in httpOnly cookie — no localStorage needed
+  // We just need to fetch /auth/me to get user info
 }
 
-function logout(showToast = true) {
-  token = null;
+async function logout(showToast = true) {
+  // Call the logout endpoint to clear the cookie
+  try {
+    await api("/auth/logout", { method: "POST" });
+  } catch (_) {
+    // Ignore errors — we'll clear local state anyway
+  }
   user = null;
-  localStorage.removeItem("ragguard_token");
   if (showToast) toast("Signed out", "ok");
   showLogin();
 }
@@ -762,15 +766,14 @@ const DEPTS = ["finance", "it", "hr", "security", "executive", "general"];
 
 (async function boot() {
   initEvents();
-  if (token) {
-    try {
-      const me = await api("/auth/me");
-      user = me;
-      showApp();
-      return;
-    } catch (_) {
-      /* token invalid → login view */
-    }
+  // Check if we have a valid session via the httpOnly cookie
+  try {
+    const me = await api("/auth/me");
+    user = me;
+    showApp();
+    return;
+  } catch (_) {
+    /* no valid session → login view */
   }
   showLogin();
 })();

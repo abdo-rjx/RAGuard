@@ -9,15 +9,28 @@ token expires. Identity never comes from the request body or message text
 """
 from dataclasses import dataclass
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
+from typing import Optional
 
 from app.auth.jwt_handler import decode_token
+from app.config import settings
 from app.database import get_db
 from app.models.user import User
 
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def _extract_token(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme)) -> str | None:
+    """Extract token from Authorization header or httpOnly cookie."""
+    # Try Authorization header first
+    if credentials and credentials.credentials:
+        return credentials.credentials
+    # Fall back to cookie
+    if "ragguard_token" in request.cookies:
+        return request.cookies["ragguard_token"]
+    return None
 
 
 @dataclass(frozen=True)
@@ -35,17 +48,17 @@ class CurrentUser:
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    token: str | None = Depends(_extract_token),
     db: Session = Depends(get_db),
 ) -> CurrentUser:
-    if credentials is None:
+    if token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
     try:
-        payload = decode_token(credentials.credentials)
+        payload = decode_token(token)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

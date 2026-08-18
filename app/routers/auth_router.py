@@ -1,11 +1,12 @@
 """POST /auth/login, GET /auth/me, plus self-service endpoints (feature B4)."""
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import CurrentUser, get_current_user
 from app.auth.jwt_handler import create_access_token
 from app.auth.password import hash_password, verify_password
 from app.audit.logger import write_audit_event
+from app.config import settings
 from app.database import get_db
 from app.models.audit_log import AuditLog
 from app.models.user import User
@@ -33,9 +34,28 @@ def _get_dummy_hash() -> str:
     return _dummy_hash
 
 
+# Cookie settings
+def _set_token_cookie(response: Response, token: str) -> None:
+    """Set the JWT in an httpOnly, secure (in prod), SameSite=lax cookie."""
+    response.set_cookie(
+        key="ragguard_token",
+        value=token,
+        httponly=True,
+        secure=settings.ENVIRONMENT == "production",
+        samesite="lax",
+        max_age=settings.JWT_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+
+
+def _clear_token_cookie(response: Response) -> None:
+    """Clear the JWT cookie."""
+    response.delete_cookie(key="ragguard_token", path="/", secure=settings.ENVIRONMENT == "production", samesite="lax")
+
+
 @router.post("/login", response_model=LoginResponse)
 @limiter.limit("10/minute")  # brute-force protection; disabled when ENVIRONMENT=test
-def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
+def login(request: Request, response: Response, body: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
     user = db.query(User).filter(User.username == body.username).first()
 
     if user is None:
@@ -103,6 +123,9 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)) -
         reason="login_success",
     )
 
+    # Set the token in an httpOnly cookie (security hardening)
+    _set_token_cookie(response, token)
+
     return LoginResponse(
         access_token=token,
         token_type="bearer",
@@ -123,6 +146,31 @@ def me(user: CurrentUser = Depends(get_current_user)) -> UserInfo:
         is_system_admin=user.is_system_admin,
         is_security_admin=user.is_security_admin,
     )
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(response: Response, user: CurrentUser = Depends(get_current_user)) -> None:
+    """Log out the current user by clearing the JWT cookie."""
+    from app.audit.logger import write_audit_event
+    from app.database import get_db
+
+    # We need a DB session for audit logging
+    db_gen = get_db()
+    db = next(db_gen)
+    try:
+        write_audit_event(
+            db=db,
+            action="LOGOUT",
+            user_id=user.id,
+            username=user.username,
+            role=user.role,
+            decision="ALLOW",
+            reason="user_logout",
+        )
+    finally:
+        db.close()
+
+    _clear_token_cookie(response)
 
 
 @router.get("/me/queries", response_model=list[QueryHistoryItem])

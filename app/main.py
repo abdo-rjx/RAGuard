@@ -9,7 +9,8 @@ Starts up in stages as phases land:
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -58,6 +59,25 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# CORS - restrict to known origins in production
+if settings.ENVIRONMENT == "production":
+    allowed_origins = []  # Configure via environment or settings
+else:
+    allowed_origins = [
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
 # Add rate limiting to app
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
@@ -80,6 +100,9 @@ async def security_headers(request, call_next):
         "form-action 'self'; "
         "frame-ancestors 'none'"
     )
+    # HSTS for production (1 year, include subdomains, preload-ready)
+    if settings.ENVIRONMENT == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 app.include_router(auth_router.router)

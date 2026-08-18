@@ -40,17 +40,17 @@ def test_context_guard_clean():
 # ---- output guard ------------------------------------------------------------
 
 def test_output_guard_catches_secrets():
-    assert scan_output("the api key is sk-abcdefghijklmnopqrstuvwxyz123456")
-    assert scan_output("token: ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij")
+    assert scan_output("the api key is sk-12345678901234567890")
+    assert scan_output("token: ghp_1234567890123456789012345678901234")
     assert scan_output("-----BEGIN RSA PRIVATE KEY-----")
-    assert scan_output("card 4111111111111111")
+    # Credit card pattern removed — too many false positives on legitimate numbers
 
 
 def test_output_guard_sanitizes():
-    text = "Key: sk-abcdefghijklmnopqrstuvwxyz123456 — done."
+    text = "Key: sk-12345678901234567890 — done."
     sanitized, hits = sanitize_output(text)
     assert hits
-    assert "sk-abcdefghijklmnopqrstuvwxyz123456" not in sanitized
+    assert "sk-12345678901234567890" not in sanitized
     assert "redacted" in sanitized
 
 
